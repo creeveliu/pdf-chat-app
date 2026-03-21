@@ -17,7 +17,7 @@ class QuestionValidationError(ValueError):
     pass
 
 
-def ask_question(question: str, top_k: int = 3) -> AskResponse:
+def ask_question(question: str, top_k: int = 3, document_id: str | None = None) -> AskResponse:
     normalized_question = question.strip()
     if not normalized_question:
         raise QuestionValidationError("Question cannot be empty.")
@@ -25,7 +25,11 @@ def ask_question(question: str, top_k: int = 3) -> AskResponse:
     if top_k <= 0:
         raise QuestionValidationError("top_k must be greater than 0.")
 
-    retrieved = retrieval.retrieve_contexts(normalized_question, top_k=top_k)
+    retrieved = retrieval.retrieve_contexts(
+        normalized_question,
+        top_k=top_k,
+        document_id=document_id,
+    )
     contexts = [
         {
             "document_id": item.document_id,

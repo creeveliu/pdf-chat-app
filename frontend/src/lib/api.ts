@@ -1,4 +1,5 @@
 export type UploadResponse = {
+  document_id: string;
   filename: string;
   text_length: number;
   page_count: number;
@@ -72,7 +73,11 @@ export async function uploadPdf(file: File): Promise<UploadResponse> {
   return (await response.json()) as UploadResponse;
 }
 
-export async function askQuestion(question: string, topK = 3): Promise<AskResponse> {
+export async function askQuestion(
+  question: string,
+  topK = 3,
+  documentId?: string,
+): Promise<AskResponse> {
   let response: Response;
   try {
     response = await fetch(`${getApiBaseUrl()}/ask`, {
@@ -82,6 +87,7 @@ export async function askQuestion(question: string, topK = 3): Promise<AskRespon
       },
       body: JSON.stringify({
         question,
+        document_id: documentId,
         top_k: topK,
       }),
     });

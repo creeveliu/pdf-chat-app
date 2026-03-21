@@ -30,11 +30,12 @@ export default function Home() {
 
     setIsUploading(true);
     setUploadError(null);
+    setUploadResult(null);
     setUploadStatus("正在上传 PDF、解析文本并建立索引...");
     setAnswer(null);
     setContexts([]);
     setAskError(null);
-    setAskStatus("索引完成后再提问。");
+    setAskStatus("等待新 PDF 建立索引后再提问。");
 
     try {
       const result = await uploadPdf(selectedFile);
@@ -51,12 +52,18 @@ export default function Home() {
   }
 
   async function handleAsk() {
+    if (!uploadResult?.document_id) {
+      setAskError("请先上传并完成索引一个 PDF。");
+      setAskStatus("还没有可提问的 PDF。");
+      return;
+    }
+
     setIsAsking(true);
     setAskError(null);
     setAskStatus("正在检索相关片段并生成回答...");
 
     try {
-      const result = await askQuestion(question, topK);
+      const result = await askQuestion(question, topK, uploadResult.document_id);
       setAnswer(result.answer);
       setContexts(result.contexts);
       setAskStatus(`已命中 ${result.contexts.length} 个引用片段。`);
@@ -101,6 +108,7 @@ export default function Home() {
           <QuestionPanel
             askError={askError}
             askStatus={askStatus}
+            canAsk={Boolean(uploadResult?.document_id)}
             isAsking={isAsking}
             question={question}
             topK={topK}

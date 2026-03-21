@@ -15,6 +15,7 @@ router = APIRouter()
 
 
 class UploadResponse(BaseModel):
+    document_id: str
     filename: str
     text_length: int
     page_count: int

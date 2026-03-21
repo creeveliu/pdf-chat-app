@@ -33,6 +33,7 @@ class StorageError(Exception):
 
 @dataclass
 class PdfUploadResponse:
+    document_id: str
     filename: str
     text_length: int
     page_count: int
@@ -129,6 +130,7 @@ async def save_and_parse_pdf(file: UploadFile) -> PdfUploadResponse:
     )
 
     return PdfUploadResponse(
+        document_id=document_id,
         filename=file.filename or storage_path.name,
         text_length=len(text),
         page_count=page_count,

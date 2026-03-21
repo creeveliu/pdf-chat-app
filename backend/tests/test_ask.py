@@ -63,16 +63,21 @@ def test_ask_returns_answer_and_contexts(monkeypatch: pytest.MonkeyPatch) -> Non
     )
 
     assert upload_response.status_code == 200
+    document_id = upload_response.json()["document_id"]
 
     def _generate_answer(question: str, contexts: list[dict[str, object]]) -> str:
         assert question == "这份 PDF 主要讲了什么？"
         assert len(contexts) == 2
         assert "PlayStation 5 Pro" in contexts[0]["text"]
+        assert all(context["document_id"] == document_id for context in contexts)
         return "这是一份 PlayStation 5 Pro 的快速开始指南。"
 
     monkeypatch.setattr(llm, "generate_answer", _generate_answer)
 
-    response = client.post("/ask", json={"question": "这份 PDF 主要讲了什么？", "top_k": 2})
+    response = client.post(
+        "/ask",
+        json={"question": "这份 PDF 主要讲了什么？", "top_k": 2, "document_id": document_id},
+    )
 
     assert response.status_code == 200
 
@@ -82,6 +87,7 @@ def test_ask_returns_answer_and_contexts(monkeypatch: pytest.MonkeyPatch) -> Non
     assert body["top_k"] == 2
     assert len(body["contexts"]) == 2
     assert body["contexts"][0]["filename"] == "guide.pdf"
+    assert all(context["document_id"] == document_id for context in body["contexts"])
 
 
 def test_ask_skips_incompatible_legacy_index(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -98,12 +104,43 @@ def test_ask_skips_incompatible_legacy_index(monkeypatch: pytest.MonkeyPatch) ->
         files={"file": ("guide.pdf", BytesIO(pdf_bytes), "application/pdf")},
     )
     assert upload_response.status_code == 200
+    document_id = upload_response.json()["document_id"]
 
     monkeypatch.setattr(llm, "generate_answer", lambda question, contexts: "基于 PDF，这是一份快速开始指南。")
 
-    response = client.post("/ask", json={"question": "这份 PDF 主要讲了什么？", "top_k": 1})
+    response = client.post(
+        "/ask",
+        json={"question": "这份 PDF 主要讲了什么？", "top_k": 1, "document_id": document_id},
+    )
 
     assert response.status_code == 200
     body = response.json()
     assert body["answer"] == "基于 PDF，这是一份快速开始指南。"
     assert body["contexts"][0]["filename"] == "guide.pdf"
+    assert body["contexts"][0]["document_id"] == document_id
+
+
+def test_ask_requires_document_id_when_multiple_indexes_exist(monkeypatch: pytest.MonkeyPatch) -> None:
+    first_pdf = build_pdf_bytes(("PlayStation guide. " * 120).strip(), page_count=1)
+    second_pdf = build_pdf_bytes(("Nintendo Switch guide. " * 120).strip(), page_count=1)
+
+    first_response = client.post(
+        "/upload",
+        files={"file": ("first.pdf", BytesIO(first_pdf), "application/pdf")},
+    )
+    second_response = client.post(
+        "/upload",
+        files={"file": ("second.pdf", BytesIO(second_pdf), "application/pdf")},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+
+    monkeypatch.setattr(llm, "generate_answer", lambda question, contexts: "不应该执行到这里。")
+
+    response = client.post("/ask", json={"question": "这份 PDF 主要讲了什么？"})
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Multiple indexed PDFs are available. Specify document_id to ask about a specific file."
+    }

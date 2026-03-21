@@ -25,6 +25,7 @@
 - [x] 前端上传表单接入
 - [x] 前端提问与回答展示
 - [x] 引用片段展示
+- [x] 当前上传 PDF 作用域问答
 
 ## Project Structure
 
@@ -89,14 +90,20 @@ curl -X POST \
   http://127.0.0.1:8000/upload
 ```
 
+返回结果中会包含当前文档的 `document_id`。前端会自动保存这个值，并在后续提问时只检索这一次上传成功的 PDF。
+
 基于已上传 PDF 提问：
 
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"question":"这份PDF主要讲了什么？","top_k":3}' \
+  -d '{"question":"这份PDF主要讲了什么？","document_id":"<upload返回的document_id>","top_k":3}' \
   http://127.0.0.1:8000/ask
 ```
+
+说明：
+- 当后端只有一个索引文档时，`/ask` 可以不传 `document_id`
+- 当后端已经存在多个 PDF 索引时，必须传 `document_id`，否则后端会返回明确错误，避免把旧文档内容混入回答
 
 ### Embedding Config
 
@@ -130,3 +137,4 @@ EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 3. 增加历史问题或会话状态
 4. 增加检索调试信息与更细致的错误提示
 5. 进一步完善聊天式交互体验
+6. 增加多文档切换或文档列表选择能力

@@ -1,6 +1,7 @@
 type QuestionPanelProps = {
   question: string;
   topK: number;
+  canAsk: boolean;
   isAsking: boolean;
   askStatus: string;
   askError: string | null;
@@ -12,6 +13,7 @@ type QuestionPanelProps = {
 export function QuestionPanel({
   question,
   topK,
+  canAsk,
   isAsking,
   askStatus,
   askError,
@@ -45,8 +47,11 @@ export function QuestionPanel({
         </label>
 
         <div className="flex flex-wrap items-end gap-4">
-          <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-200">检索数量 Top K</span>
+          <label className="max-w-56 space-y-2">
+            <span className="text-sm font-medium text-slate-200">参考片段数量</span>
+            <p className="text-xs leading-5 text-slate-400">
+              回答前先从 PDF 中取多少段最相关内容作为参考。默认 3 段，通常已经够用。
+            </p>
             <input
               className="w-24 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-sky-400"
               max={10}
@@ -61,7 +66,7 @@ export function QuestionPanel({
 
           <button
             className="inline-flex min-w-32 items-center justify-center rounded-full bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:bg-slate-500 disabled:text-slate-300"
-            disabled={!question.trim() || isAsking}
+            disabled={!canAsk || !question.trim() || isAsking}
             onClick={onAsk}
             type="button"
           >

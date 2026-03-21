@@ -2,7 +2,7 @@
 
 **Status:** Completed on 2026-03-21
 
-**Result:** The frontend now supports the full product flow in one page: PDF upload, upload status, indexing result display, question input, answer rendering, and cited context display. The page uses modular components, an isolated API client, environment-based backend URL configuration, and has been verified end-to-end against the running backend.
+**Result:** The frontend now supports the full product flow in one page: PDF upload, upload status, indexing result display, question input, answer rendering, and cited context display. The page uses modular components, an isolated API client, environment-based backend URL configuration, and has been verified end-to-end against the running backend. The current upload result also owns the active `document_id`, so subsequent questions are scoped to the most recently indexed PDF.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 

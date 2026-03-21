@@ -58,6 +58,7 @@ def test_upload_pdf_returns_parsed_metadata() -> None:
     assert response.status_code == 200
 
     body = response.json()
+    assert body["document_id"]
     assert body["filename"] == "sample.pdf"
     assert body["page_count"] == 3
     assert body["text_length"] > 0

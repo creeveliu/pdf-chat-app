@@ -17,6 +17,10 @@ class RetrievalError(RuntimeError):
     pass
 
 
+class DocumentSelectionError(ValueError):
+    pass
+
+
 @dataclass
 class RetrievedContext:
     document_id: str
@@ -38,10 +42,32 @@ def _load_index_payload(document_dir) -> tuple[faiss.Index, dict]:
     return index, payload
 
 
-def retrieve_contexts(question: str, top_k: int = 3) -> list[RetrievedContext]:
-    document_dirs = [path for path in vector_store.ensure_index_root().iterdir() if path.is_dir()]
+def _resolve_document_dirs(document_id: str | None) -> list:
+    index_root = vector_store.ensure_index_root()
+    document_dirs = [path for path in index_root.iterdir() if path.is_dir()]
     if not document_dirs:
         raise RetrievalError("No vector index available. Upload a PDF first.")
+
+    if document_id:
+        document_dir = index_root / document_id
+        if not document_dir.is_dir():
+            raise RetrievalError("No vector index found for the specified document_id.")
+        return [document_dir]
+
+    if len(document_dirs) > 1:
+        raise DocumentSelectionError(
+            "Multiple indexed PDFs are available. Specify document_id to ask about a specific file."
+        )
+
+    return document_dirs
+
+
+def retrieve_contexts(
+    question: str,
+    top_k: int = 3,
+    document_id: str | None = None,
+) -> list[RetrievedContext]:
+    document_dirs = _resolve_document_dirs(document_id)
 
     query_embeddings = embedding.generate_embeddings([question])
     query_vector = np.array(query_embeddings, dtype="float32")
