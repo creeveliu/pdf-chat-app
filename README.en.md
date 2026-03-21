@@ -10,6 +10,8 @@
 
 A web application for uploading PDFs, building vector indexes, and asking follow-up questions scoped to the current document.
 
+Live frontend URL: [https://pdf-chat-with.vercel.app/](https://pdf-chat-with.vercel.app/)
+
 ## Screenshot
 
 ![PDF Chat App overview](docs/images/app-overview.png)
@@ -201,7 +203,7 @@ The current version can be deployed as a personal/demo environment, but uploaded
 NEXT_PUBLIC_API_BASE_URL=https://your-backend.up.railway.app
 ```
 
-5. After deployment, note the frontend URL, for example `https://your-frontend.vercel.app`.
+5. After deployment, the frontend production URL is [https://pdf-chat-with.vercel.app/](https://pdf-chat-with.vercel.app/).
 
 ### Deploy the backend to Railway
 
@@ -225,7 +227,7 @@ EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_PROVIDER=dashscope
 LLM_MODEL=qwen-plus
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-VERCEL_FRONTEND_URL=https://your-frontend.vercel.app
+VERCEL_FRONTEND_URL=https://pdf-chat-with.vercel.app
 ```
 
 Add these as needed for your provider and deployment:

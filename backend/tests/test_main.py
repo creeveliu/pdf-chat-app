@@ -15,7 +15,7 @@ def test_build_allowed_origins_includes_local_defaults(monkeypatch) -> None:
 
 
 def test_build_allowed_origins_merges_frontend_envs(monkeypatch) -> None:
-    monkeypatch.setenv("FRONTEND_URL", "https://pdf-chat-demo.vercel.app/")
+    monkeypatch.setenv("FRONTEND_URL", "https://pdf-chat-with.vercel.app/")
     monkeypatch.setenv("VERCEL_FRONTEND_URL", "https://pdf-chat-git-main-cl.vercel.app")
     monkeypatch.setenv(
         "CORS_ALLOW_ORIGINS",
@@ -27,8 +27,8 @@ def test_build_allowed_origins_merges_frontend_envs(monkeypatch) -> None:
     assert origins == [
         "http://127.0.0.1:3000",
         "http://localhost:3000",
-        "https://pdf-chat-demo.vercel.app",
         "https://pdf-chat-git-main-cl.vercel.app",
+        "https://pdf-chat-with.vercel.app",
         "https://preview.example.com",
         "https://staging.example.com",
     ]
