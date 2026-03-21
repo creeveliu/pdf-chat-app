@@ -1,18 +1,20 @@
 # PDF Chat App
 
+[English](README.en.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688)
 ![React](https://img.shields.io/badge/React-19-149ECA)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB)
 
-中文 | English
-
 一个用于上传 PDF、建立向量索引，并围绕当前文档进行连续问答的 Web 应用。
 
-PDF Chat App is a monorepo web application for uploading PDFs, building vector indexes, and asking follow-up questions scoped to the current document.
+## 截图
 
-## Features
+![PDF Chat App 概览](docs/images/app-overview.png)
+
+## 功能特性
 
 - 上传 PDF 后自动解析文本、切分 chunk、生成 embedding，并写入 FAISS 索引
 - 基于文件内容 `SHA-256` 做文档级去重，重复上传时复用已有索引
@@ -20,62 +22,52 @@ PDF Chat App is a monorepo web application for uploading PDFs, building vector i
 - 前端采用聊天式界面，支持多轮提问、流式回答和 Markdown 渲染
 - 每条 AI 回答都返回引用上下文与页码信息，便于查看来源片段
 
-- Automatic PDF parsing, chunking, embedding generation, and FAISS index persistence
-- Document-level deduplication using file-content `SHA-256`
-- Question answering scoped to the current `document_id`
-- Chat-style frontend with streaming answers and Markdown rendering
-- Citation metadata with page references and retrieved context snippets
-
-## Screenshot
-
-![PDF Chat App overview](docs/images/app-overview.png)
-
-## Tech Stack
+## 技术栈
 
 - Frontend: Next.js 16, React 19, Tailwind CSS 4, TypeScript
 - Backend: FastAPI, Uvicorn, Python 3.10
 - Vector store: FAISS
 - PDF parsing: PyMuPDF
-- LLM / embeddings: OpenAI-compatible APIs, currently configured for DashScope compatibility
+- LLM / embeddings: OpenAI-compatible APIs，当前默认按 DashScope 兼容方式配置
 
-## Repository Structure
+## 仓库结构
 
 ```text
 pdf-chat-app/
-├── frontend/              # Next.js frontend
-│   ├── src/app/           # App routes and page entry
-│   ├── src/components/    # Chat, upload, citation UI
-│   ├── src/lib/           # API wrappers and client utilities
-│   ├── src/types/         # Frontend domain types
-│   └── src/test/          # Frontend test setup
-├── backend/               # FastAPI backend
-│   ├── app/main.py        # App initialization and router registration
-│   ├── app/routes/        # HTTP routes
-│   ├── app/services/      # PDF, retrieval, embedding, QA services
-│   ├── data/uploads/      # Runtime PDF storage
-│   ├── data/index/        # Runtime FAISS indexes and document registry
-│   └── tests/             # Backend tests
-├── AGENTS.md              # Internal agent guidance for this repository
+├── frontend/              # Next.js 前端
+│   ├── src/app/           # 页面与路由入口
+│   ├── src/components/    # 聊天、上传、引用 UI
+│   ├── src/lib/           # API 封装与客户端工具
+│   ├── src/types/         # 前端领域类型
+│   └── src/test/          # 前端测试初始化
+├── backend/               # FastAPI 后端
+│   ├── app/main.py        # 应用初始化与 router 注册
+│   ├── app/routes/        # HTTP 路由
+│   ├── app/services/      # PDF、检索、embedding、问答服务
+│   ├── data/uploads/      # 运行时 PDF 存储
+│   ├── data/index/        # 运行时 FAISS 索引与文档注册表
+│   └── tests/             # 后端测试
+├── AGENTS.md              # 仓库内部 agent 协作说明
 └── README.md
 ```
 
-## Requirements
+## 环境要求
 
-- Node.js 20+ and npm
+- Node.js 20+ 与 npm
 - Python 3.10+
-- A valid embedding API key
-- A valid LLM API key if you want answer generation
+- 可用的 embedding API Key
+- 若需要生成回答，还需要可用的 LLM API Key
 
-## Quick Start
+## 快速开始
 
-### 1. Clone the repository
+### 1. 克隆仓库
 
 ```bash
 git clone <your-repo-url>
 cd pdf-chat-app
 ```
 
-### 2. Start the backend
+### 2. 启动后端
 
 ```bash
 cd backend
@@ -86,15 +78,15 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-默认地址 / Default URL: `http://127.0.0.1:8000`
+默认地址：`http://127.0.0.1:8000`
 
-健康检查 / Health check:
+健康检查：
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-### 3. Start the frontend
+### 3. 启动前端
 
 ```bash
 cd frontend
@@ -103,17 +95,15 @@ cp .env.example .env.local
 npm run dev
 ```
 
-默认地址 / Default URL: `http://localhost:3000`
+默认地址：`http://localhost:3000`
 
-## Environment Variables
+## 环境变量
 
 前端和后端都只应提交 `.env.example`，不要提交真实 `.env` 文件。
 
-Commit only `.env.example` files. Real `.env` files must stay untracked.
+### 后端
 
-### Backend
-
-Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and fill in real values:
+将 [`backend/.env.example`](backend/.env.example) 复制为 `backend/.env`，再填写真实值：
 
 ```env
 EMBEDDING_PROVIDER=dashscope
@@ -125,27 +115,23 @@ LLM_MODEL=qwen-plus
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 ```
 
-说明 / Notes:
+说明：
 
 - 如果使用 DashScope，可同时复用 `DASHSCOPE_API_KEY` 作为 embedding 和 LLM 的密钥来源
-- 如果切换到 OpenAI-compatible provider，请根据 `backend/app/services/embedding.py` 和 `backend/app/services/llm.py` 中的规则设置 `OPENAI_API_KEY` 或 `LLM_API_KEY` / `EMBEDDING_API_KEY`
+- 如果切换到其他 OpenAI-compatible provider，请根据 `backend/app/services/embedding.py` 和 `backend/app/services/llm.py` 的读取规则设置 `OPENAI_API_KEY` 或 `LLM_API_KEY` / `EMBEDDING_API_KEY`
 - `/upload` 在当前实现里会立即做索引，因此 embedding 配置在上传前就必须可用
 
-- DashScope can be used as both the embedding and LLM provider through its OpenAI-compatible API
-- For other providers, configure the matching API key variables expected by the backend services
-- `/upload` immediately performs indexing, so embedding configuration must be valid before uploading files
+### 前端
 
-### Frontend
-
-Copy [`frontend/.env.example`](frontend/.env.example) to `frontend/.env.local`:
+将 [`frontend/.env.example`](frontend/.env.example) 复制为 `frontend/.env.local`：
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-## Usage
+## 使用方式
 
-### Upload a PDF
+### 上传 PDF
 
 ```bash
 curl -X POST \
@@ -155,9 +141,7 @@ curl -X POST \
 
 上传成功后会返回 `document_id`。前端会保存该值，并在后续提问时优先传给后端。
 
-The upload response contains a `document_id`. The frontend stores it and sends it with follow-up questions.
-
-### Ask a question
+### 发起提问
 
 ```bash
 curl -X POST \
@@ -166,7 +150,7 @@ curl -X POST \
   http://127.0.0.1:8000/ask
 ```
 
-### Ask a question with streaming
+### 流式提问
 
 ```bash
 curl -N -X POST \
@@ -175,13 +159,11 @@ curl -N -X POST \
   http://127.0.0.1:8000/ask/stream
 ```
 
-`/ask/stream` uses `text/event-stream` and emits `start`, `delta`, `done`, and `error` events.
+`/ask/stream` 使用 `text/event-stream`，会返回 `start`、`delta`、`done` 和 `error` 事件。
 
-## Runtime Data and Persistence
+## 运行时数据与持久化
 
 `backend/data/uploads/` 和 `backend/data/index/` 是运行时数据目录，不是源码目录。
-
-`backend/data/uploads/` and `backend/data/index/` are runtime data directories, not source artifacts.
 
 它们当前用于保存：
 
@@ -190,18 +172,9 @@ curl -N -X POST \
 - chunk metadata
 - 文档注册表 `documents.json`
 
-They currently store:
-
-- uploaded PDFs
-- FAISS index files
-- chunk metadata
-- the document registry `documents.json`
-
 这意味着当前后端部署需要持久化磁盘。纯无状态、临时文件系统的 serverless 环境并不适合直接承载现有后端。
 
-This means the backend needs persistent storage in production. Purely stateless serverless environments are not a good fit for the current backend without architectural changes.
-
-## Verification
+## 验证命令
 
 ### Backend
 
@@ -219,17 +192,12 @@ npm run lint
 npm run build
 ```
 
-## Known Limitations
+## 已知限制
 
 - 当前默认问答语义是“围绕当前文档”，不是跨文档全局检索
 - 上传和索引为同步链路，大 PDF 处理时间会较长
 - 当前数据默认保存在本地磁盘，未接入对象存储或外部向量数据库
 - 后端生产部署仍需额外配置 CORS 和持久化存储
-
-- The default query scope is the current document, not cross-document retrieval
-- Uploading and indexing are synchronous, so large PDFs take longer to process
-- Runtime data is still stored on local disk
-- Production deployment still requires CORS and persistent storage configuration
 
 ## Roadmap
 
@@ -238,22 +206,13 @@ npm run build
 - 改善引用片段的去重、排序、折叠和阅读体验
 - 增加更清晰的错误提示、空态提示和交互反馈
 
-- Improve mobile chat layout and input experience
-- Add document list, document switching, or upload history
-- Improve citation deduplication, sorting, collapsing, and readability
-- Add clearer error, empty-state, and interaction feedback
-
-## Contributing
+## 贡献
 
 欢迎提交 issue 和 PR。开始之前请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
-Issues and pull requests are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before contributing.
-
-## Security
+## 安全
 
 如果你发现了安全问题，请不要直接公开提交 issue，请参考 [`SECURITY.md`](SECURITY.md)。
-
-If you find a security issue, please do not open a public issue first. See [`SECURITY.md`](SECURITY.md).
 
 ## License
 
