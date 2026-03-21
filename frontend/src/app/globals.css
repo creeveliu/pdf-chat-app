@@ -4,11 +4,22 @@
   color-scheme: light;
 }
 
+html {
+  background: #f8fafc;
+}
+
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
 }
 
 * {
   box-sizing: border-box;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
 }

@@ -22,14 +22,17 @@
 - [x] 阿里百炼 OpenAI 兼容 embedding 支持
 - [x] 检索接口
 - [x] AI 问答链路
-- [ ] 前端上传表单接入
-- [ ] 聊天式前端交互
+- [x] 前端上传表单接入
+- [x] 前端提问与回答展示
+- [x] 引用片段展示
 
 ## Project Structure
 
 ```text
 pdf-chat-app/
 ├── frontend/   # Next.js frontend
+│   ├── src/components/  # Upload, question, answer panels
+│   └── src/lib/         # Frontend API wrappers
 ├── backend/    # FastAPI backend
 │   ├── app/routes/    # FastAPI routes
 │   ├── app/services/  # PDF processing and business logic
@@ -49,6 +52,19 @@ npm run dev
 ```
 
 默认地址：`http://localhost:3000`
+
+前端环境变量：
+
+```bash
+cd frontend
+cp .env.example .env.local
+```
+
+默认内容：
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
 
 ### Backend
 
@@ -109,8 +125,8 @@ EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 
 ## Next Plan
 
-1. 在 `frontend` 接入 PDF 上传表单和上传状态管理
-2. 为上传结果增加前端预览展示
-3. 在前端接入提问输入框与回答展示
-4. 增加引用片段的可视化展示与交互
-5. 在前端补齐完整上传-提问联调流程
+1. 优化问答页面布局与移动端体验
+2. 改善引用片段去重与排序展示
+3. 增加历史问题或会话状态
+4. 增加检索调试信息与更细致的错误提示
+5. 进一步完善聊天式交互体验

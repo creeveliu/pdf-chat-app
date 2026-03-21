@@ -1,6 +1,8 @@
 .DS_Store
 .env
 .env.*
+!backend/.env.example
+!frontend/.env.example
 *.log
 
 # Node / Next.js

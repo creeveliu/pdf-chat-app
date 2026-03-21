@@ -1,55 +1,118 @@
+"use client";
+
+import { useState } from "react";
+
+import { AnswerPanel } from "@/components/AnswerPanel";
+import { QuestionPanel } from "@/components/QuestionPanel";
+import { UploadPanel } from "@/components/UploadPanel";
+import { askQuestion, type AskContext, uploadPdf, type UploadResponse } from "@/lib/api";
+
 export default function Home() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadStatus, setUploadStatus] = useState("还没有上传 PDF。");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const [question, setQuestion] = useState("");
+  const [topK, setTopK] = useState(3);
+  const [askStatus, setAskStatus] = useState("索引完成后再提问。");
+  const [askError, setAskError] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [contexts, setContexts] = useState<AskContext[]>([]);
+  const [isAsking, setIsAsking] = useState(false);
+
+  async function handleUpload() {
+    if (!selectedFile) {
+      setUploadError("请先选择一个 PDF 文件。");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadStatus("正在上传 PDF、解析文本并建立索引...");
+    setAnswer(null);
+    setContexts([]);
+    setAskError(null);
+    setAskStatus("索引完成后再提问。");
+
+    try {
+      const result = await uploadPdf(selectedFile);
+      setUploadResult(result);
+      setUploadStatus(`上传完成：${result.filename}`);
+      setAskStatus("索引已就绪，现在可以提问了。");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "上传失败。";
+      setUploadError(message);
+      setUploadStatus("上传失败。");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function handleAsk() {
+    setIsAsking(true);
+    setAskError(null);
+    setAskStatus("正在检索相关片段并生成回答...");
+
+    try {
+      const result = await askQuestion(question, topK);
+      setAnswer(result.answer);
+      setContexts(result.contexts);
+      setAskStatus(`已命中 ${result.contexts.length} 个引用片段。`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "提问失败。";
+      setAskError(message);
+      setAskStatus("提问失败。");
+      setAnswer(null);
+      setContexts([]);
+    } finally {
+      setIsAsking(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe,_#f8fafc_45%,_#e2e8f0_100%)] px-6 py-16 text-slate-950">
-      <div className="mx-auto flex max-w-5xl flex-col gap-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-10">
         <section className="space-y-4">
           <p className="inline-flex rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-sm font-medium text-sky-700 shadow-sm">
-            PDF Chat Monorepo
+            PDF 问答应用
           </p>
           <div className="space-y-3">
-            <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-balance">
-              Upload a PDF and ask AI questions in one workflow.
+            <h1 className="max-w-4xl text-5xl font-semibold tracking-tight text-balance">
+              上传 PDF，建立索引，输入问题，并查看回答与引用片段。
             </h1>
-            <p className="max-w-2xl text-lg leading-8 text-slate-600">
-              This frontend is initialized with Next.js and Tailwind. The backend
-              is served separately with FastAPI.
+            <p className="max-w-3xl text-lg leading-8 text-slate-600">
+              这个页面直接连接 FastAPI 后端，覆盖完整本地链路：上传、建索引、提问、基于上下文的回答展示，以及引用片段查看。
             </p>
           </div>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-3xl border border-white/70 bg-white/80 p-8 shadow-xl shadow-slate-200/80 backdrop-blur">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-semibold">Frontend ready</h2>
-                <p className="mt-2 text-slate-600">
-                  Add file upload, chat history, and streaming answers here.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <p className="text-sm font-medium text-slate-500">Upload area placeholder</p>
-                <p className="mt-2 text-sm text-slate-400">
-                  Connect this section to the FastAPI upload endpoint next.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-slate-950 p-8 text-slate-50 shadow-xl shadow-slate-300/40">
-            <h2 className="text-2xl font-semibold">Backend endpoints</h2>
-            <div className="mt-6 space-y-4 text-sm">
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="font-mono text-sky-300">GET /</p>
-                <p className="mt-2 text-slate-300">Basic API status message.</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-4">
-                <p className="font-mono text-sky-300">GET /health</p>
-                <p className="mt-2 text-slate-300">Health check endpoint for local verification.</p>
-              </div>
-            </div>
-          </div>
+        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <UploadPanel
+            fileName={selectedFile?.name ?? ""}
+            isUploading={isUploading}
+            uploadError={uploadError}
+            uploadResult={uploadResult}
+            uploadStatus={uploadStatus}
+            onFileChange={setSelectedFile}
+            onUpload={handleUpload}
+          />
+          <QuestionPanel
+            askError={askError}
+            askStatus={askStatus}
+            isAsking={isAsking}
+            question={question}
+            topK={topK}
+            onAsk={handleAsk}
+            onQuestionChange={setQuestion}
+            onTopKChange={(value) => {
+              setTopK(Number.isNaN(value) ? 3 : Math.min(10, Math.max(1, value)));
+            }}
+          />
         </section>
+
+        <AnswerPanel answer={answer} contexts={contexts} />
       </div>
     </main>
   );
