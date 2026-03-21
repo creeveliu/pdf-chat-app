@@ -20,8 +20,8 @@
 - [x] Embedding 生成
 - [x] FAISS 向量索引落盘
 - [x] 阿里百炼 OpenAI 兼容 embedding 支持
-- [ ] 检索接口
-- [ ] AI 问答链路
+- [x] 检索接口
+- [x] AI 问答链路
 - [ ] 前端上传表单接入
 - [ ] 聊天式前端交互
 
@@ -73,6 +73,15 @@ curl -X POST \
   http://127.0.0.1:8000/upload
 ```
 
+基于已上传 PDF 提问：
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"question":"这份PDF主要讲了什么？","top_k":3}' \
+  http://127.0.0.1:8000/ask
+```
+
 ### Embedding Config
 
 `/upload` 在当前实现里会立即做 chunk、embedding 和 FAISS 建索引，因此需要先配置 embedding provider。
@@ -102,6 +111,6 @@ EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 
 1. 在 `frontend` 接入 PDF 上传表单和上传状态管理
 2. 为上传结果增加前端预览展示
-3. 增加检索接口，支持 query embedding + FAISS top-k
-4. 定义问答 API，开始串联文档与问题输入
-5. 在前端补齐聊天界面与联调流程
+3. 在前端接入提问输入框与回答展示
+4. 增加引用片段的可视化展示与交互
+5. 在前端补齐完整上传-提问联调流程
