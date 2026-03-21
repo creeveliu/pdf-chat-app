@@ -14,9 +14,10 @@
 - [x] Next.js 前端脚手架完成
 - [x] FastAPI 后端脚手架完成
 - [x] 前后端本地启动验证完成
-- [ ] PDF 上传接口
-- [ ] PDF 文件存储与解析
+- [x] PDF 上传接口
+- [x] PDF 文件本地存储与解析
 - [ ] AI 问答链路
+- [ ] 前端上传表单接入
 - [ ] 聊天式前端交互
 
 ## Project Structure
@@ -25,6 +26,9 @@
 pdf-chat-app/
 ├── frontend/   # Next.js frontend
 ├── backend/    # FastAPI backend
+│   ├── app/routes/    # FastAPI routes
+│   ├── app/services/  # PDF processing and business logic
+│   └── data/uploads/  # Local uploaded PDF storage
 ├── README.md
 └── AGENTS.md
 ```
@@ -55,10 +59,18 @@ cd backend
 curl http://127.0.0.1:8000/health
 ```
 
+上传 PDF：
+
+```bash
+curl -X POST \
+  -F "file=@/absolute/path/to/your.pdf;type=application/pdf" \
+  http://127.0.0.1:8000/upload
+```
+
 ## Next Plan
 
-1. 实现前端 PDF 上传表单与基础状态管理
-2. 在 FastAPI 中新增上传路由与文件保存逻辑
-3. 接入 PDF 文本提取流程
-4. 定义问答 API，串联上传文档与提问流程
-5. 在前端补齐聊天界面与请求联调
+1. 在 `frontend` 接入 PDF 上传表单和上传状态管理
+2. 为上传结果增加前端预览展示
+3. 定义问答 API，开始串联文档与问题输入
+4. 为后续 RAG 增加文本切分和索引准备层
+5. 在前端补齐聊天界面与联调流程
