@@ -20,12 +20,12 @@ export function ChatInput({
   onSend,
 }: ChatInputProps) {
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-slate-950 p-5 text-white shadow-xl shadow-slate-300/40">
-      <div className="flex flex-col gap-4">
+    <section className="rounded-[1.75rem] border border-slate-200 bg-slate-100 p-4 text-slate-900 shadow-lg shadow-slate-300/25">
+      <div className="flex flex-col gap-3">
         <label className="space-y-2">
-          <span className="text-sm font-medium text-slate-200">输入你的问题</span>
+          <span className="text-sm font-medium text-slate-700">输入你的问题</span>
           <textarea
-            className="min-h-28 w-full rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-400 focus:border-sky-400"
+            className="min-h-24 w-full rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-sky-400"
             disabled={isDisabled || isSending}
             placeholder={isDisabled ? "请先上传并完成索引一个 PDF。" : "例如：这份说明书主要讲了什么？"}
             value={question}
@@ -43,12 +43,12 @@ export function ChatInput({
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-sm text-slate-300">{statusText}</p>
-            {errorText ? <p className="text-sm text-rose-300">{errorText}</p> : null}
+            <p className="text-sm text-slate-600">{statusText}</p>
+            {errorText ? <p className="text-sm text-rose-600">{errorText}</p> : null}
           </div>
 
           <button
-            className="inline-flex min-w-32 items-center justify-center rounded-full bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+            className="inline-flex min-w-32 items-center justify-center rounded-full bg-slate-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
             disabled={isDisabled || isSending || !question.trim()}
             onClick={onSend}
             type="button"

@@ -1,4 +1,5 @@
 from io import BytesIO
+import json
 from pathlib import Path
 
 import fitz
@@ -20,6 +21,25 @@ def build_pdf_bytes(text: str, page_count: int = 1) -> bytes:
     pdf_bytes = document.tobytes()
     document.close()
     return pdf_bytes
+
+
+def parse_sse_events(raw_text: str) -> list[tuple[str, dict[str, object]]]:
+    blocks = [block.strip() for block in raw_text.strip().split("\n\n") if block.strip()]
+    events: list[tuple[str, dict[str, object]]] = []
+
+    for block in blocks:
+        event_name = ""
+        data = ""
+        for line in block.splitlines():
+            if line.startswith("event:"):
+                event_name = line.removeprefix("event:").strip()
+            elif line.startswith("data:"):
+                data = line.removeprefix("data:").strip()
+
+        if event_name:
+            events.append((event_name, json.loads(data)))
+
+    return events
 
 
 @pytest.fixture(autouse=True)
@@ -95,6 +115,57 @@ def test_ask_returns_answer_and_contexts(monkeypatch: pytest.MonkeyPatch) -> Non
     assert body["citations"]
     assert body["citations"][0]["page_numbers"]
     assert body["citations"][0]["chunk_index"] == body["contexts"][0]["chunk_index"]
+
+
+def test_ask_stream_returns_ordered_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    pdf_bytes = build_pdf_bytes(("PlayStation 5 Pro quick start guide. " * 80).strip(), page_count=2)
+
+    upload_response = client.post(
+        "/upload",
+        files={"file": ("guide.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    )
+
+    assert upload_response.status_code == 200
+    document_id = upload_response.json()["document_id"]
+
+    def _stream_answer(question: str, contexts: list[dict[str, object]]):
+        assert question == "这份 PDF 主要讲了什么？"
+        assert len(contexts) == 2
+        assert all(context["document_id"] == document_id for context in contexts)
+        yield "这是一份 "
+        yield "PlayStation 5 Pro 的快速开始指南。"
+
+    monkeypatch.setattr(llm, "stream_answer", _stream_answer, raising=False)
+
+    with client.stream(
+        "POST",
+        "/ask/stream",
+        json={"question": "这份 PDF 主要讲了什么？", "top_k": 2, "document_id": document_id},
+    ) as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        body = response.read().decode("utf-8")
+
+    events = parse_sse_events(body)
+    assert [event_name for event_name, _ in events] == ["start", "delta", "delta", "done"]
+    assert events[0][1] == {"question": "这份 PDF 主要讲了什么？", "top_k": 2}
+    assert events[1][1] == {"delta": "这是一份 "}
+    assert events[2][1] == {"delta": "PlayStation 5 Pro 的快速开始指南。"}
+
+    done_payload = events[3][1]
+    assert done_payload["question"] == "这份 PDF 主要讲了什么？"
+    assert done_payload["answer"] == "这是一份 PlayStation 5 Pro 的快速开始指南。"
+    assert done_payload["top_k"] == 2
+    assert len(done_payload["contexts"]) == 2
+    assert done_payload["contexts"][0]["document_id"] == document_id
+    assert done_payload["citations"][0]["chunk_index"] == done_payload["contexts"][0]["chunk_index"]
+
+
+def test_ask_stream_rejects_empty_question() -> None:
+    response = client.post("/ask/stream", json={"question": "   "})
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Question cannot be empty."}
 
 
 def test_ask_skips_incompatible_legacy_index(monkeypatch: pytest.MonkeyPatch) -> None:

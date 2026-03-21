@@ -19,6 +19,7 @@ export type AssistantChatMessage = BaseChatMessage & {
   role: "assistant";
   citations: Citation[];
   contexts: AskContext[];
+  isStreaming?: boolean;
 };
 
 export type ChatMessage = SystemChatMessage | UserChatMessage | AssistantChatMessage;

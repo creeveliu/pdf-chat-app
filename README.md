@@ -30,6 +30,10 @@
 - [x] chunk metadata 与页码引用
 - [x] 聊天式前端界面
 - [x] 前端消息历史与引用展开
+- [x] `/ask/stream` 流式回答接口
+- [x] 前端流式消息渲染与最终引用补齐
+- [x] 聊天自动跟随与手动滚动不抢焦点
+- [x] 聊天布局压缩与浅色输入区优化
 
 ## Project Structure
 
@@ -112,6 +116,20 @@ curl -X POST \
 - 当后端已经存在多个 PDF 索引时，必须传 `document_id`，否则后端会返回明确错误，避免把旧文档内容混入回答
 - `/ask` 返回的 `contexts` 已包含 `page_number`、`page_numbers`、`chunk_index` 等 metadata，`citations` 用于前端展示页码摘要
 
+流式提问：
+
+```bash
+curl -N -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"question":"这份PDF主要讲了什么？","document_id":"<upload返回的document_id>","top_k":3}' \
+  http://127.0.0.1:8000/ask/stream
+```
+
+说明：
+- `/ask/stream` 使用 `text/event-stream` 返回 `start`、`delta`、`done`、`error` 事件
+- `done` 事件会一次性带上完整 `answer`、`contexts`、`citations` 和 `top_k`
+- 前端默认走流式接口，保留同步 `/ask` 作为兼容路径
+
 ### Frontend Verification
 
 ```bash
@@ -124,7 +142,10 @@ npm run build
 当前前端体验：
 - 上传区域与聊天区分离
 - 连续多轮提问会保留消息历史
+- 回答会按流式片段逐步渲染，并在完成后补齐引用信息
+- 发送新问题时会重新自动滚动到底部；用户手动滚动后，不会被后续流式输出强制拉回底部
 - 每条 AI 消息可展开查看引用片段、页码与 chunk 编号
+- 聊天区与输入区都已改为更紧凑的浅色布局，桌面端首屏可视内容更多
 - 未上传文档前会禁用提问输入框
 
 ### Embedding Config

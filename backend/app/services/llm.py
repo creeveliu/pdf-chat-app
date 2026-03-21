@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Iterator
 import logging
 import os
 
@@ -59,13 +60,7 @@ def build_llm_client(settings: LlmSettings) -> OpenAI:
     return OpenAI(**client_kwargs)
 
 
-def generate_answer(question: str, contexts: list[dict[str, object]]) -> str:
-    if not contexts:
-        return FALLBACK_ANSWER
-
-    settings = get_llm_settings()
-    logger.info("Generating answer with provider=%s model=%s", settings.provider, settings.model)
-
+def build_prompts(question: str, contexts: list[dict[str, object]]) -> tuple[str, str]:
     context_text = "\n\n".join(
         (
             f"[{index + 1}] {context['filename']} "
@@ -86,6 +81,17 @@ def generate_answer(question: str, contexts: list[dict[str, object]]) -> str:
     )
     user_prompt = f"问题：{question}\n\n可用上下文：\n{context_text}"
 
+    return system_prompt, user_prompt
+
+
+def generate_answer(question: str, contexts: list[dict[str, object]]) -> str:
+    if not contexts:
+        return FALLBACK_ANSWER
+
+    settings = get_llm_settings()
+    logger.info("Generating answer with provider=%s model=%s", settings.provider, settings.model)
+    system_prompt, user_prompt = build_prompts(question, contexts)
+
     try:
         client = build_llm_client(settings)
         response = client.chat.completions.create(
@@ -102,3 +108,39 @@ def generate_answer(question: str, contexts: list[dict[str, object]]) -> str:
         raise LlmServiceError(f"Failed to generate answer from {settings.provider}.") from exc
 
     return answer or FALLBACK_ANSWER
+
+
+def stream_answer(question: str, contexts: list[dict[str, object]]) -> Iterator[str]:
+    if not contexts:
+        yield FALLBACK_ANSWER
+        return
+
+    settings = get_llm_settings()
+    logger.info("Streaming answer with provider=%s model=%s", settings.provider, settings.model)
+    system_prompt, user_prompt = build_prompts(question, contexts)
+
+    try:
+        client = build_llm_client(settings)
+        response = client.chat.completions.create(
+            model=settings.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.1,
+            stream=True,
+        )
+
+        emitted_content = False
+        for chunk in response:
+            delta = chunk.choices[0].delta.content or ""
+            if not delta:
+                continue
+            emitted_content = True
+            yield delta
+
+        if not emitted_content:
+            yield FALLBACK_ANSWER
+    except Exception as exc:
+        logger.exception("Streaming LLM request failed for provider=%s", settings.provider)
+        raise LlmServiceError(f"Failed to generate answer from {settings.provider}.") from exc

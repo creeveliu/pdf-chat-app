@@ -19,22 +19,28 @@ export function UploadPanel({
   onFileChange,
   onUpload,
 }: UploadPanelProps) {
+  const uploadSummary = uploadResult
+    ? uploadResult.already_exists
+      ? "复用已有索引"
+      : "新建索引完成"
+    : null;
+
   return (
-    <section className="rounded-3xl border border-white/70 bg-white/90 p-8 shadow-xl shadow-slate-200/80 backdrop-blur">
-      <div className="flex flex-col gap-6">
-        <div className="space-y-2">
+    <section className="self-start rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl shadow-slate-200/80 backdrop-blur">
+      <div className="flex flex-col gap-4">
+        <div className="space-y-1.5">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
             第一步
           </p>
           <h2 className="text-2xl font-semibold text-slate-950">上传 PDF</h2>
           <p className="text-sm leading-6 text-slate-600">
-            选择一个 PDF，发送到后端，并等待解析与索引建立完成。
+            选择文件并完成索引，随后就能在右侧连续提问。
           </p>
         </div>
 
-        <label className="flex cursor-pointer flex-col gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600 transition hover:border-sky-400 hover:bg-sky-50/60">
+        <label className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 transition hover:border-sky-400 hover:bg-sky-50/60">
           <span className="font-medium text-slate-900">选择 PDF 文件</span>
-          <span>{fileName || "还没有选择文件。"}</span>
+          <span className="truncate">{fileName || "还没有选择文件。"}</span>
           <input
             className="hidden"
             type="file"
@@ -47,7 +53,7 @@ export function UploadPanel({
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            className="inline-flex min-w-32 items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="inline-flex min-w-28 items-center justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             disabled={!fileName || isUploading}
             onClick={onUpload}
             type="button"
@@ -64,40 +70,38 @@ export function UploadPanel({
         ) : null}
 
         {uploadResult ? (
-          <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">索引状态</p>
-              <p className="mt-1 font-medium text-slate-900">
-                {uploadResult.already_exists
-                  ? "检测到重复文档，已复用已有索引。"
-                  : "已完成新文档解析与索引建立。"}
-              </p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                document_id: <span className="font-mono text-slate-700">{uploadResult.document_id}</span>
-              </p>
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">索引状态</p>
+                <p className="font-medium text-slate-900">{uploadSummary}</p>
+              </div>
+              <div className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+                {uploadResult.page_count} 页
+              </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">文件名</p>
-              <p className="mt-1 font-medium text-slate-900">{uploadResult.filename}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">页数</p>
-              <p className="mt-1 font-medium text-slate-900">{uploadResult.page_count}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">文本长度</p>
-              <p className="mt-1 font-medium text-slate-900">{uploadResult.text_length}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">分块数量</p>
-              <p className="mt-1 font-medium text-slate-900">{uploadResult.chunk_count ?? "-"}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">新增分块</p>
-              <p className="mt-1 font-medium text-slate-900">{uploadResult.indexed_new_chunks ?? "-"}</p>
-            </div>
+            <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">文件名</p>
+                <p className="mt-1 break-all font-medium text-slate-900">{uploadResult.filename}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">document_id</p>
+                <p className="mt-1 break-all font-mono text-[13px] text-slate-700">{uploadResult.document_id}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">分块</p>
+                <p className="mt-1 font-medium text-slate-900">{uploadResult.chunk_count ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">新增分块</p>
+                <p className="mt-1 font-medium text-slate-900">{uploadResult.indexed_new_chunks ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">文本长度</p>
+                <p className="mt-1 font-medium text-slate-900">{uploadResult.text_length}</p>
+              </div>
             </div>
           </div>
         ) : null}

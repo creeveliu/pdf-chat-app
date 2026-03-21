@@ -39,6 +39,21 @@ export type AskResponse = {
   top_k: number;
 };
 
+export type AskStreamStartEvent = {
+  question: string;
+  top_k: number;
+};
+
+export type AskStreamDeltaEvent = {
+  delta: string;
+};
+
+export type AskStreamHandlers = {
+  onStart?: (event: AskStreamStartEvent) => void;
+  onDelta?: (event: AskStreamDeltaEvent) => void;
+  onDone?: (response: AskResponse) => void;
+};
+
 type ApiErrorPayload = {
   detail?: string;
 };
@@ -116,4 +131,136 @@ export async function askQuestion(
   }
 
   return (await response.json()) as AskResponse;
+}
+
+function parseSseBlock(block: string): { event: string; data: string } | null {
+  const lines = block
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return null;
+  }
+
+  let eventName = "";
+  const dataLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("event:")) {
+      eventName = line.slice("event:".length).trim();
+      continue;
+    }
+
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trim());
+    }
+  }
+
+  if (!eventName || dataLines.length === 0) {
+    return null;
+  }
+
+  return {
+    event: eventName,
+    data: dataLines.join("\n"),
+  };
+}
+
+export async function askQuestionStream(
+  question: string,
+  handlers: AskStreamHandlers,
+  topK = 3,
+  documentId?: string,
+): Promise<AskResponse> {
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}/ask/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question,
+        document_id: documentId,
+        top_k: topK,
+      }),
+    });
+  } catch {
+    throw new Error("无法连接后端。请确认 FastAPI 服务已经启动。");
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+
+  if (!response.body) {
+    throw new Error("浏览器不支持流式响应，无法接收回答。");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let donePayload: AskResponse | null = null;
+
+  function handleBlock(block: string) {
+    const parsed = parseSseBlock(block);
+    if (!parsed) {
+      return;
+    }
+
+    const payload = JSON.parse(parsed.data) as
+      | AskStreamStartEvent
+      | AskStreamDeltaEvent
+      | AskResponse
+      | { detail?: string };
+
+    if (parsed.event === "start") {
+      handlers.onStart?.(payload as AskStreamStartEvent);
+      return;
+    }
+
+    if (parsed.event === "delta") {
+      handlers.onDelta?.(payload as AskStreamDeltaEvent);
+      return;
+    }
+
+    if (parsed.event === "done") {
+      donePayload = payload as AskResponse;
+      handlers.onDone?.(donePayload);
+      return;
+    }
+
+    if (parsed.event === "error") {
+      const message = (payload as { detail?: string }).detail;
+      throw new Error(message || "流式回答失败。");
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+
+    let delimiterIndex = buffer.indexOf("\n\n");
+    while (delimiterIndex >= 0) {
+      const block = buffer.slice(0, delimiterIndex);
+      buffer = buffer.slice(delimiterIndex + 2);
+      handleBlock(block);
+      delimiterIndex = buffer.indexOf("\n\n");
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (buffer.trim()) {
+    handleBlock(buffer);
+  }
+
+  if (!donePayload) {
+    throw new Error("回答在完成前中断了，请重试。");
+  }
+
+  return donePayload;
 }

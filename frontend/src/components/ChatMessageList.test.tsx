@@ -49,7 +49,7 @@ describe("ChatMessageList", () => {
       },
     ];
 
-    render(<ChatMessageList isAsking={false} messages={messages} />);
+    const { container } = render(<ChatMessageList isAsking={false} messages={messages} />);
 
     expect(screen.getByText("文档已就绪，可以开始提问。")).toBeInTheDocument();
     expect(screen.getByText("这份 PDF 主要讲了什么？")).toBeInTheDocument();
@@ -60,5 +60,312 @@ describe("ChatMessageList", () => {
 
     expect(screen.getByText("这是第 12 页的引用片段。")).toBeInTheDocument();
     expect(screen.getAllByText(/片段 #3/)).not.toHaveLength(0);
+
+    const chatRoot = container.firstElementChild;
+    const scrollRegion = container.querySelector(".overflow-y-auto");
+    expect(chatRoot).toHaveClass("min-h-0");
+    expect(scrollRegion).toHaveClass("min-h-0");
+
+    const userHeading = screen.getByText("你");
+    const userBubble = userHeading.closest("article");
+    expect(userBubble).toHaveClass("bg-slate-200", "text-slate-900");
+  });
+
+  it("does not force scroll to bottom after the user scrolls up during an active answer", () => {
+    const { container, rerender } = render(
+      <ChatMessageList
+        isAsking={true}
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "第一条回答，正在输出。",
+            createdAt: "2026-03-21T10:01:05.000Z",
+            citations: [],
+            contexts: [],
+            isStreaming: true,
+          },
+        ]}
+      />,
+    );
+
+    const scrollRegion = container.querySelector(".overflow-y-auto");
+    expect(scrollRegion).not.toBeNull();
+
+    let scrollTopValue = 0;
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollHeight", {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(scrollRegion as HTMLDivElement, "clientHeight", {
+      configurable: true,
+      value: 400,
+    });
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollTop", {
+      configurable: true,
+      get() {
+        return scrollTopValue;
+      },
+      set(value: number) {
+        scrollTopValue = value;
+      },
+    });
+    const scrollToMock = vi.fn();
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollTo", {
+      configurable: true,
+      value: scrollToMock,
+    });
+    scrollToMock.mockClear();
+    scrollTopValue = 800;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+    scrollToMock.mockClear();
+
+    scrollTopValue = 100;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+    scrollToMock.mockClear();
+
+    rerender(
+      <ChatMessageList
+        isAsking={true}
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "第一条回答，正在继续输出。",
+            createdAt: "2026-03-21T10:01:05.000Z",
+            citations: [],
+            contexts: [],
+            isStreaming: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(scrollToMock).not.toHaveBeenCalled();
+  });
+
+  it("re-enables auto scroll when a new ask starts, then stops again after manual scroll", () => {
+    const { container, rerender } = render(
+      <ChatMessageList
+        isAsking={false}
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "旧回答",
+            createdAt: "2026-03-21T10:01:05.000Z",
+            citations: [],
+            contexts: [],
+          },
+        ]}
+      />,
+    );
+
+    const scrollRegion = container.querySelector(".overflow-y-auto");
+    expect(scrollRegion).not.toBeNull();
+
+    let scrollTopValue = 0;
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollHeight", {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(scrollRegion as HTMLDivElement, "clientHeight", {
+      configurable: true,
+      value: 400,
+    });
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollTop", {
+      configurable: true,
+      get() {
+        return scrollTopValue;
+      },
+      set(value: number) {
+        scrollTopValue = value;
+      },
+    });
+
+    const scrollToMock = vi.fn();
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollTo", {
+      configurable: true,
+      value: scrollToMock,
+    });
+    scrollToMock.mockClear();
+    scrollTopValue = 800;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+    scrollToMock.mockClear();
+
+    scrollTopValue = 100;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+    scrollToMock.mockClear();
+
+    rerender(
+      <ChatMessageList
+        isAsking={true}
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "旧回答",
+            createdAt: "2026-03-21T10:01:05.000Z",
+            citations: [],
+            contexts: [],
+          },
+          {
+            id: "assistant-2",
+            role: "assistant",
+            content: "新回答开头",
+            createdAt: "2026-03-21T10:01:06.000Z",
+            citations: [],
+            contexts: [],
+            isStreaming: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(scrollToMock).toHaveBeenCalledTimes(1);
+    scrollTopValue = 800;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+    scrollToMock.mockClear();
+
+    scrollTopValue = 150;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+    scrollToMock.mockClear();
+
+    rerender(
+      <ChatMessageList
+        isAsking={true}
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "旧回答",
+            createdAt: "2026-03-21T10:01:05.000Z",
+            citations: [],
+            contexts: [],
+          },
+          {
+            id: "assistant-2",
+            role: "assistant",
+            content: "新回答开头，继续输出。",
+            createdAt: "2026-03-21T10:01:06.000Z",
+            citations: [],
+            contexts: [],
+            isStreaming: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(scrollToMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps auto scroll enabled after programmatic scrolling starts a new answer", () => {
+    const { container, rerender } = render(
+      <ChatMessageList
+        isAsking={false}
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "旧回答",
+            createdAt: "2026-03-21T10:01:05.000Z",
+            citations: [],
+            contexts: [],
+          },
+        ]}
+      />,
+    );
+
+    const scrollRegion = container.querySelector(".overflow-y-auto");
+    expect(scrollRegion).not.toBeNull();
+
+    let scrollTopValue = 0;
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollHeight", {
+      configurable: true,
+      value: 1200,
+    });
+    Object.defineProperty(scrollRegion as HTMLDivElement, "clientHeight", {
+      configurable: true,
+      value: 400,
+    });
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollTop", {
+      configurable: true,
+      get() {
+        return scrollTopValue;
+      },
+      set(value: number) {
+        scrollTopValue = value;
+      },
+    });
+
+    const scrollToMock = vi.fn();
+    Object.defineProperty(scrollRegion as HTMLDivElement, "scrollTo", {
+      configurable: true,
+      value: scrollToMock,
+    });
+    scrollToMock.mockClear();
+    scrollTopValue = 800;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+    scrollToMock.mockClear();
+
+    scrollTopValue = 100;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+    scrollToMock.mockClear();
+
+    rerender(
+      <ChatMessageList
+        isAsking={true}
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "旧回答",
+            createdAt: "2026-03-21T10:01:05.000Z",
+            citations: [],
+            contexts: [],
+          },
+          {
+            id: "assistant-2",
+            role: "assistant",
+            content: "新回答开头",
+            createdAt: "2026-03-21T10:01:06.000Z",
+            citations: [],
+            contexts: [],
+            isStreaming: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(scrollToMock).toHaveBeenCalledTimes(1);
+    scrollTopValue = 500;
+    fireEvent.scroll(scrollRegion as HTMLDivElement);
+
+    rerender(
+      <ChatMessageList
+        isAsking={true}
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "旧回答",
+            createdAt: "2026-03-21T10:01:05.000Z",
+            citations: [],
+            contexts: [],
+          },
+          {
+            id: "assistant-2",
+            role: "assistant",
+            content: "新回答开头，继续输出。",
+            createdAt: "2026-03-21T10:01:06.000Z",
+            citations: [],
+            contexts: [],
+            isStreaming: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(scrollToMock).toHaveBeenCalledTimes(2);
   });
 });

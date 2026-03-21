@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ChatInput } from "@/components/ChatInput";
 import { ChatMessageList } from "@/components/ChatMessageList";
 import { UploadPanel } from "@/components/UploadPanel";
-import { askQuestion, uploadPdf, type UploadResponse } from "@/lib/api";
+import { askQuestionStream, uploadPdf, type UploadResponse } from "@/lib/api";
 import type { ChatMessage } from "@/types/chat";
 
 
@@ -29,6 +29,18 @@ function createUserMessage(content: string): ChatMessage {
     role: "user",
     content,
     createdAt: new Date().toISOString(),
+  };
+}
+
+function createAssistantMessage(): ChatMessage {
+  return {
+    id: createMessageId("assistant"),
+    role: "assistant",
+    content: "",
+    citations: [],
+    contexts: [],
+    createdAt: new Date().toISOString(),
+    isStreaming: true,
   };
 }
 
@@ -112,29 +124,66 @@ export default function Home() {
     setIsAsking(true);
     setAskError(null);
     setAskStatus("正在检索相关片段并生成回答...");
-    setMessages((currentMessages) => [...currentMessages, createUserMessage(normalizedQuestion)]);
+    const assistantMessage = createAssistantMessage();
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      createUserMessage(normalizedQuestion),
+      assistantMessage,
+    ]);
     setQuestion("");
 
     try {
-      const result = await askQuestion(normalizedQuestion, 3, uploadResult.document_id);
-      setMessages((currentMessages) => [
-        ...currentMessages,
+      const result = await askQuestionStream(
+        normalizedQuestion,
         {
-          id: createMessageId("assistant"),
-          role: "assistant",
-          content: result.answer,
-          citations: result.citations,
-          contexts: result.contexts,
-          createdAt: new Date().toISOString(),
+          onDelta(event) {
+            setMessages((currentMessages) =>
+              currentMessages.map((message) =>
+                message.id === assistantMessage.id && message.role === "assistant"
+                  ? { ...message, content: `${message.content}${event.delta}` }
+                  : message,
+              ),
+            );
+          },
+          onDone(response) {
+            setMessages((currentMessages) =>
+              currentMessages.map((message) =>
+                message.id === assistantMessage.id && message.role === "assistant"
+                  ? {
+                      ...message,
+                      content: response.answer,
+                      citations: response.citations,
+                      contexts: response.contexts,
+                      isStreaming: false,
+                    }
+                  : message,
+              ),
+            );
+          },
         },
-      ]);
+        3,
+        uploadResult.document_id,
+      );
+      setMessages((currentMessages) =>
+        currentMessages.map((message) =>
+          message.id === assistantMessage.id && message.role === "assistant"
+            ? {
+                ...message,
+                content: result.answer,
+                citations: result.citations,
+                contexts: result.contexts,
+                isStreaming: false,
+              }
+            : message,
+        ),
+      );
       setAskStatus(`已返回回答，并命中 ${result.contexts.length} 个引用片段。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "提问失败。";
       setAskError(message);
       setAskStatus("提问失败。");
       setMessages((currentMessages) => [
-        ...currentMessages,
+        ...currentMessages.filter((currentMessage) => currentMessage.id !== assistantMessage.id),
         createSystemMessage(`提问失败：${message}`, "error"),
       ]);
     } finally {
@@ -143,25 +192,25 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe,_#f8fafc_38%,_#e2e8f0_100%)] px-6 py-10 text-slate-950">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <section className="rounded-[2rem] border border-white/80 bg-white/88 px-6 py-5 shadow-xl shadow-slate-200/70 backdrop-blur">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-3">
-              <p className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700 shadow-sm">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe,_#f8fafc_38%,_#e2e8f0_100%)] px-6 py-7 text-slate-950">
+      <div className="mx-auto flex max-w-[92rem] flex-col gap-5">
+        <section className="rounded-[2rem] border border-white/80 bg-white/88 px-5 py-4 shadow-xl shadow-slate-200/70 backdrop-blur">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <p className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 shadow-sm">
             PDF 问答应用
               </p>
-              <div className="space-y-2">
-                <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-balance">
+              <div className="space-y-1.5">
+                <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-balance">
                   把 PDF 变成一个可连续对话的聊天助手。
                 </h1>
-                <p className="max-w-3xl text-base leading-7 text-slate-600">
+                <p className="max-w-3xl text-sm leading-6 text-slate-600">
                   上传文档后，问题和回答会按消息流持续累积。每条 AI 回复都能展开查看引用片段与页码。
                 </p>
               </div>
             </div>
 
-            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 shadow-sm">
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 shadow-sm">
               <p className="text-xs uppercase tracking-[0.22em] text-slate-400">当前文档</p>
               <p className="mt-1 font-medium text-slate-900">
                 {uploadResult ? uploadResult.filename : "还没有上传文档"}
@@ -177,7 +226,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <section className="grid items-start gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
           <UploadPanel
             fileName={selectedFile?.name ?? ""}
             isUploading={isUploading}
@@ -188,7 +237,7 @@ export default function Home() {
             onUpload={handleUpload}
           />
 
-          <div className="flex min-h-[70vh] flex-col gap-4">
+          <div className="flex h-[78vh] min-h-0 flex-col gap-3">
             <ChatMessageList isAsking={isAsking} messages={messages} />
             <ChatInput
               errorText={askError}

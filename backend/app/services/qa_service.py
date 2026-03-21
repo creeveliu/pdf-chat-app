@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from app.services import llm, retrieval
@@ -12,6 +13,12 @@ class AskResponse:
     contexts: list[dict[str, object]]
     citations: list[dict[str, object]]
     top_k: int
+
+
+@dataclass
+class StreamDeltaEvent:
+    type: str
+    data: dict[str, object]
 
 
 class QuestionValidationError(ValueError):
@@ -79,3 +86,61 @@ def ask_question(question: str, top_k: int = 3, document_id: str | None = None) 
         citations=citations,
         top_k=top_k,
     )
+
+
+def stream_question(
+    question: str,
+    top_k: int = 3,
+    document_id: str | None = None,
+) -> Iterator[StreamDeltaEvent]:
+    normalized_question = question.strip()
+    if not normalized_question:
+        raise QuestionValidationError("Question cannot be empty.")
+
+    if top_k <= 0:
+        raise QuestionValidationError("top_k must be greater than 0.")
+
+    retrieved = retrieval.retrieve_contexts(
+        normalized_question,
+        top_k=top_k,
+        document_id=document_id,
+    )
+    contexts = [
+        {
+            "document_id": item.document_id,
+            "filename": item.filename,
+            "chunk_id": item.chunk_id,
+            "chunk_index": item.chunk_index,
+            "page_number": item.page_number,
+            "page_numbers": item.page_numbers,
+            "chunk_hash": item.chunk_hash,
+            "text": item.text,
+            "score": item.score,
+        }
+        for item in retrieved
+    ]
+    citations = build_citations(contexts)
+
+    def _generate() -> Iterator[StreamDeltaEvent]:
+        yield StreamDeltaEvent(
+            type="start",
+            data={"question": normalized_question, "top_k": top_k},
+        )
+
+        answer_parts: list[str] = []
+        for delta in llm.stream_answer(normalized_question, contexts):
+            answer_parts.append(delta)
+            yield StreamDeltaEvent(type="delta", data={"delta": delta})
+
+        yield StreamDeltaEvent(
+            type="done",
+            data={
+                "question": normalized_question,
+                "answer": "".join(answer_parts).strip() or llm.FALLBACK_ANSWER,
+                "contexts": contexts,
+                "citations": citations,
+                "top_k": top_k,
+            },
+        )
+
+    return _generate()
