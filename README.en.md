@@ -108,17 +108,27 @@ Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and fill i
 ```env
 EMBEDDING_PROVIDER=dashscope
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
+EMBEDDING_API_KEY=
 EMBEDDING_MODEL=text-embedding-v4
 EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_PROVIDER=dashscope
+LLM_API_KEY=
 LLM_MODEL=qwen-plus
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+FRONTEND_URL=http://localhost:3000
+VERCEL_FRONTEND_URL=
+CORS_ALLOW_ORIGINS=
+CORS_ALLOW_ORIGIN_REGEX=
 ```
 
 Notes:
 
 - DashScope can be used as both the embedding and LLM provider through its OpenAI-compatible API
 - For other providers, configure the matching variables read by `backend/app/services/embedding.py` and `backend/app/services/llm.py`
+- `FRONTEND_URL` and `VERCEL_FRONTEND_URL` are added to the backend CORS allowlist; `CORS_ALLOW_ORIGINS` can append more origins as a comma-separated list
+- Use `CORS_ALLOW_ORIGIN_REGEX` if you want to match Vercel preview domains
 - `/upload` immediately performs indexing, so embedding configuration must be valid before uploading files
 
 ### Frontend
@@ -128,6 +138,8 @@ Copy [`frontend/.env.example`](frontend/.env.example) to `frontend/.env.local`:
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
+
+In Vercel production, set this to your Railway backend public URL, for example `https://your-backend.up.railway.app`.
 
 ## Usage
 
@@ -174,6 +186,66 @@ They currently store:
 
 This means the backend needs persistent storage in production. Purely stateless serverless environments are not a good fit for the current backend.
 
+The current version can be deployed as a personal/demo environment, but uploaded PDFs, FAISS indexes, and `documents.json` are not guaranteed to persist long-term. If Railway rebuilds the service, redeploys to a fresh instance, or does not use a persistent volume, historical data can be lost.
+
+## Deployment
+
+### Deploy the frontend to Vercel
+
+1. Import this repository into Vercel.
+2. Set the Root Directory to `frontend/`.
+3. Keep the default Build Command: `npm run build`.
+4. Configure the environment variable:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://your-backend.up.railway.app
+```
+
+5. After deployment, note the frontend URL, for example `https://your-frontend.vercel.app`.
+
+### Deploy the backend to Railway
+
+1. Create a new Railway service from this repository.
+2. Set the Root Directory to `backend/`.
+3. Use this start command:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+```
+
+The repository also includes an equivalent [`backend/Procfile`](backend/Procfile).
+
+4. At minimum, configure:
+
+```env
+EMBEDDING_PROVIDER=dashscope
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+EMBEDDING_MODEL=text-embedding-v4
+EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_PROVIDER=dashscope
+LLM_MODEL=qwen-plus
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+VERCEL_FRONTEND_URL=https://your-frontend.vercel.app
+```
+
+Add these as needed for your provider and deployment:
+
+- `EMBEDDING_API_KEY`
+- `LLM_API_KEY`
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL`
+- `CORS_ALLOW_ORIGINS`
+- `CORS_ALLOW_ORIGIN_REGEX`
+
+5. After Railway is live, verify `/health`, then copy the public backend URL into Vercel as `NEXT_PUBLIC_API_BASE_URL`.
+
+### Recommended deployment order
+
+1. Deploy the Railway backend first and get the public URL.
+2. Deploy the Vercel frontend with `NEXT_PUBLIC_API_BASE_URL` pointing to that backend URL.
+3. Add the final Vercel production domain back into Railway as `VERCEL_FRONTEND_URL`.
+4. If you need preview domains, add `CORS_ALLOW_ORIGIN_REGEX`.
+
 ## Verification
 
 ### Backend
@@ -197,7 +269,7 @@ npm run build
 - The default query scope is the current document, not cross-document retrieval
 - Uploading and indexing are synchronous, so large PDFs take longer to process
 - Runtime data is stored on local disk
-- Production deployment still requires CORS and persistent storage configuration
+- The Vercel + Railway setup is best treated as a demo/personal deployment and does not guarantee long-term persistence for uploaded files or indexes
 
 ## Roadmap
 

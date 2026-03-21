@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,46 @@ from app.routes.upload import router as upload_router
 logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
+DEFAULT_ALLOWED_ORIGINS = (
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+)
+
+
+def _normalize_origin(origin: str) -> str:
+    return origin.strip().rstrip("/")
+
+
+def _split_origins(value: str | None) -> list[str]:
+    if not value:
+        return []
+
+    return [
+        normalized
+        for item in value.split(",")
+        if (normalized := _normalize_origin(item))
+    ]
+
+
+def build_allowed_origins() -> list[str]:
+    origins = {
+        _normalize_origin(origin)
+        for origin in DEFAULT_ALLOWED_ORIGINS
+    }
+
+    for env_name in ("FRONTEND_URL", "VERCEL_FRONTEND_URL"):
+        env_value = _normalize_origin(os.getenv(env_name, ""))
+        if env_value:
+            origins.add(env_value)
+
+    origins.update(_split_origins(os.getenv("CORS_ALLOW_ORIGINS")))
+    return sorted(origins)
+
+
+def build_allow_origin_regex() -> str | None:
+    regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "").strip()
+    return regex or None
+
 app = FastAPI(
     title="PDF Chat API",
     description="Backend service for uploading PDFs and asking AI questions.",
@@ -18,10 +59,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=build_allowed_origins(),
+    allow_origin_regex=build_allow_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

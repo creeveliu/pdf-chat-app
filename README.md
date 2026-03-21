@@ -108,17 +108,27 @@ npm run dev
 ```env
 EMBEDDING_PROVIDER=dashscope
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
+EMBEDDING_API_KEY=
 EMBEDDING_MODEL=text-embedding-v4
 EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_PROVIDER=dashscope
+LLM_API_KEY=
 LLM_MODEL=qwen-plus
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+FRONTEND_URL=http://localhost:3000
+VERCEL_FRONTEND_URL=
+CORS_ALLOW_ORIGINS=
+CORS_ALLOW_ORIGIN_REGEX=
 ```
 
 说明：
 
 - 如果使用 DashScope，可同时复用 `DASHSCOPE_API_KEY` 作为 embedding 和 LLM 的密钥来源
 - 如果切换到其他 OpenAI-compatible provider，请根据 `backend/app/services/embedding.py` 和 `backend/app/services/llm.py` 的读取规则设置 `OPENAI_API_KEY` 或 `LLM_API_KEY` / `EMBEDDING_API_KEY`
+- `FRONTEND_URL` 和 `VERCEL_FRONTEND_URL` 会加入后端 CORS 白名单；`CORS_ALLOW_ORIGINS` 可继续追加多个域名，使用逗号分隔
+- 如果需要匹配 Vercel preview 域名，可额外设置 `CORS_ALLOW_ORIGIN_REGEX`
 - `/upload` 在当前实现里会立即做索引，因此 embedding 配置在上传前就必须可用
 
 ### 前端
@@ -128,6 +138,8 @@ LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
+
+Vercel 生产环境应将该值设置为 Railway 后端公网地址，例如 `https://your-backend.up.railway.app`。
 
 ## 使用方式
 
@@ -172,7 +184,65 @@ curl -N -X POST \
 - chunk metadata
 - 文档注册表 `documents.json`
 
-这意味着当前后端部署需要持久化磁盘。纯无状态、临时文件系统的 serverless 环境并不适合直接承载现有后端。
+这意味着当前后端部署需要可写磁盘。当前版本可以部署为“自己用的演示版”，但上传文件、FAISS 索引和 `documents.json` 都不保证长期持久化；如果 Railway 实例重建、重新部署或未挂载持久卷，历史数据可能丢失。
+
+## 部署
+
+### Frontend 部署到 Vercel
+
+1. 在 Vercel 导入当前仓库。
+2. 将 Root Directory 设为 `frontend/`。
+3. Build Command 使用默认的 `npm run build`。
+4. 配置环境变量：
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://your-backend.up.railway.app
+```
+
+5. 部署完成后，记下前端域名，例如 `https://your-frontend.vercel.app`。
+
+### Backend 部署到 Railway
+
+1. 在 Railway 为当前仓库新建服务。
+2. 将 Root Directory 设为 `backend/`。
+3. 启动命令使用：
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+```
+
+仓库中也提供了 [`backend/Procfile`](backend/Procfile)，内容等价。
+
+4. 至少配置以下环境变量：
+
+```env
+EMBEDDING_PROVIDER=dashscope
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+EMBEDDING_MODEL=text-embedding-v4
+EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_PROVIDER=dashscope
+LLM_MODEL=qwen-plus
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+VERCEL_FRONTEND_URL=https://your-frontend.vercel.app
+```
+
+按实际 provider 选择性补充：
+
+- `EMBEDDING_API_KEY`
+- `LLM_API_KEY`
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL`
+- `CORS_ALLOW_ORIGINS`
+- `CORS_ALLOW_ORIGIN_REGEX`
+
+5. Railway 部署完成后，先访问 `/health` 检查服务是否正常，再把公网地址回填到 Vercel 的 `NEXT_PUBLIC_API_BASE_URL`。
+
+### 推荐部署顺序
+
+1. 先部署 Railway backend，拿到公网地址。
+2. 再部署 Vercel frontend，并设置 `NEXT_PUBLIC_API_BASE_URL`。
+3. 将 Vercel 的正式域名填回 Railway 的 `VERCEL_FRONTEND_URL`。
+4. 如需支持 Vercel preview 域名，再配置 `CORS_ALLOW_ORIGIN_REGEX`。
 
 ## 验证命令
 
@@ -197,7 +267,7 @@ npm run build
 - 当前默认问答语义是“围绕当前文档”，不是跨文档全局检索
 - 上传和索引为同步链路，大 PDF 处理时间会较长
 - 当前数据默认保存在本地磁盘，未接入对象存储或外部向量数据库
-- 后端生产部署仍需额外配置 CORS 和持久化存储
+- Vercel + Railway 方案当前更适合作为演示版或个人使用，不保证上传文件与索引长期持久化
 
 ## Roadmap
 
