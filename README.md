@@ -1,9 +1,10 @@
-<img width="3742" height="1924" alt="image" src="https://github.com/user-attachments/assets/6fb15b46-8a5e-4bfd-93eb-838cae5ec5e7" />
-
-
 # PDF Chat App
 
 一个用于上传 PDF 并基于文档内容进行 AI 问答的 Web 应用。当前仓库采用 monorepo 结构，前端与后端分离，便于并行开发和后续持续迭代。
+
+## UI Preview
+
+<img width="3742" height="1924" alt="PDF Chat App UI Preview" src="https://github.com/user-attachments/assets/6fb15b46-8a5e-4bfd-93eb-838cae5ec5e7" />
 
 ## Tech Stack
 
