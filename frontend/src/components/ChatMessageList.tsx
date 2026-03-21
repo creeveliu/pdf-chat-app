@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { AnswerCitations } from "@/components/AnswerCitations";
+import { ChatMarkdown } from "@/components/ChatMarkdown";
 import type { ChatMessage } from "@/types/chat";
 
 
@@ -60,9 +61,8 @@ export function ChatMessageList({ messages, isAsking }: ChatMessageListProps) {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white/92 shadow-2xl shadow-slate-200/70 backdrop-blur">
-      <div className="border-b border-slate-200/80 px-6 py-4">
+      <div className="border-b border-slate-200/80 px-6 py-3">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">聊天区</p>
-        <h2 className="mt-2 text-xl font-semibold text-slate-950">围绕当前 PDF 连续提问</h2>
       </div>
 
       <div
@@ -119,7 +119,7 @@ export function ChatMessageList({ messages, isAsking }: ChatMessageListProps) {
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-2 whitespace-pre-wrap">{message.content}</p>
+                <ChatMarkdown content={message.content} />
                 <AnswerCitations citations={message.citations} contexts={message.contexts} />
                 <p className="mt-3 text-right text-xs text-slate-400">{formatTimeLabel(message.createdAt)}</p>
               </article>

@@ -65,10 +65,51 @@ describe("ChatMessageList", () => {
     const scrollRegion = container.querySelector(".overflow-y-auto");
     expect(chatRoot).toHaveClass("min-h-0");
     expect(scrollRegion).toHaveClass("min-h-0");
+    expect(screen.queryByRole("heading", { name: "围绕当前 PDF 连续提问" })).not.toBeInTheDocument();
 
     const userHeading = screen.getByText("你");
     const userBubble = userHeading.closest("article");
     expect(userBubble).toHaveClass("bg-slate-200", "text-slate-900");
+  });
+
+  it("renders assistant message content as markdown while keeping user messages as plain text", () => {
+    const messages: ChatMessage[] = [
+      {
+        id: "user-1",
+        role: "user",
+        content: "**不要**被渲染成 Markdown",
+        createdAt: "2026-03-21T10:01:00.000Z",
+      },
+      {
+        id: "assistant-1",
+        role: "assistant",
+        content: [
+          "## 回答摘要",
+          "",
+          "包含 **重点**、`inline code` 和列表：",
+          "",
+          "- 第一项",
+          "- 第二项",
+          "",
+          "```ts",
+          "const answer = 'markdown';",
+          "```",
+        ].join("\n"),
+        createdAt: "2026-03-21T10:01:05.000Z",
+        citations: [],
+        contexts: [],
+      },
+    ];
+
+    render(<ChatMessageList isAsking={false} messages={messages} />);
+
+    expect(screen.getByText("**不要**被渲染成 Markdown")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "回答摘要" })).toBeInTheDocument();
+    expect(screen.getByText("重点")).toContainHTML("strong");
+    expect(screen.getByText("inline code").tagName).toBe("CODE");
+    expect(screen.getByText("第一项")).toBeInTheDocument();
+    expect(screen.getByText("第二项")).toBeInTheDocument();
+    expect(screen.getByText("const answer = 'markdown';")).toBeInTheDocument();
   });
 
   it("does not force scroll to bottom after the user scrolls up during an active answer", () => {
