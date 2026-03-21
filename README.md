@@ -10,7 +10,7 @@
 
 一个用于上传 PDF、建立向量索引，并围绕当前文档进行连续问答的 Web 应用。
 
-线上前端访问地址：`https://frontend-sand-three-17.vercel.app/`
+线上前端访问地址：[https://frontend-sand-three-17.vercel.app/](https://frontend-sand-three-17.vercel.app/)
 
 ## 截图
 
@@ -201,7 +201,7 @@ curl -N -X POST \
 NEXT_PUBLIC_API_BASE_URL=https://your-backend.up.railway.app
 ```
 
-5. 部署完成后，前端正式访问地址为 `https://frontend-sand-three-17.vercel.app/`。
+5. 部署完成后，前端正式访问地址为 [https://frontend-sand-three-17.vercel.app/](https://frontend-sand-three-17.vercel.app/)。
 
 ### Backend 部署到 Railway
 
