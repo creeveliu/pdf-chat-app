@@ -5,7 +5,13 @@ import { useState } from "react";
 import { ChatInput } from "@/components/ChatInput";
 import { ChatMessageList } from "@/components/ChatMessageList";
 import { UploadPanel } from "@/components/UploadPanel";
-import { askQuestionStream, uploadPdf, type UploadResponse } from "@/lib/api";
+import {
+  askQuestionStream,
+  uploadPdfStream,
+  type UploadEmbeddingProgressEvent,
+  type UploadResponse,
+  type UploadStageEvent,
+} from "@/lib/api";
 import type { ChatMessage } from "@/types/chat";
 
 
@@ -44,6 +50,31 @@ function createAssistantMessage(): ChatMessage {
   };
 }
 
+function buildUploadStageStatus(event: UploadStageEvent): string {
+  switch (event.stage) {
+    case "upload_received":
+      return "文件已传到服务器，正在准备解析...";
+    case "reusing_index":
+      return "检测到重复文档，正在复用已有索引...";
+    case "parsing_pdf":
+      return "正在解析 PDF 文本...";
+    case "chunking":
+      return event.page_count
+        ? `已解析 ${event.page_count} 页，正在切分引用片段...`
+        : "正在切分引用片段...";
+    case "generating_embeddings":
+      return event.chunk_count
+        ? `正在生成向量（共 ${event.chunk_count} 个片段）...`
+        : "正在生成向量...";
+    case "persisting_index":
+      return "正在写入向量索引...";
+  }
+}
+
+function buildEmbeddingProgressStatus(event: UploadEmbeddingProgressEvent): string {
+  return `正在生成向量（第 ${event.current_batch} / ${event.total_batches} 批，${event.completed_chunks} / ${event.total_chunks} 个片段）...`;
+}
+
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState("还没有上传 PDF。");
@@ -67,12 +98,19 @@ export default function Home() {
 
     setIsUploading(true);
     setUploadError(null);
-    setUploadStatus("正在上传 PDF、解析文本并建立索引...");
+    setUploadStatus("正在上传文件到服务器...");
     setAskError(null);
     setAskStatus("等待新 PDF 建立索引后再提问。");
 
     try {
-      const result = await uploadPdf(selectedFile);
+      const result = await uploadPdfStream(selectedFile, {
+        onStage(event) {
+          setUploadStatus(buildUploadStageStatus(event));
+        },
+        onEmbeddingProgress(event) {
+          setUploadStatus(buildEmbeddingProgressStatus(event));
+        },
+      });
       const isSameDocument = uploadResult?.document_id === result.document_id;
       const systemMessage = createSystemMessage(
         isSameDocument

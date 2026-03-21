@@ -1,4 +1,4 @@
-import { askQuestionStream } from "@/lib/api";
+import { askQuestionStream, uploadPdfStream } from "@/lib/api";
 
 
 function buildStreamResponse(chunks: string[]): Response {
@@ -60,6 +60,47 @@ describe("askQuestionStream", () => {
     ]);
     expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/ask/stream",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+  });
+});
+
+describe("uploadPdfStream", () => {
+  it("parses staged SSE events and returns the final upload payload", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://127.0.0.1:8000");
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      buildStreamResponse([
+        'event: stage\ndata: {"stage":"upload_received","filename":"guide.pdf"}\n\n',
+        'event: stage\ndata: {"stage":"parsing_pdf","filename":"guide.pdf"}\n\n',
+        'event: embedding_progress\ndata: {"current_batch":1,"total_batches":2,"completed_chunks":3,"total_chunks":6}\n\n',
+        'event: done\ndata: {"document_id":"doc-1","already_exists":false,"filename":"guide.pdf","text_length":1200,"page_count":12,"preview":"preview","chunk_count":6,"indexed_new_chunks":6,"embedding_count":6}\n\n',
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const events: string[] = [];
+    const file = new File(["pdf"], "guide.pdf", { type: "application/pdf" });
+    const result = await uploadPdfStream(file, {
+      onStage(event) {
+        events.push(`stage:${event.stage}`);
+      },
+      onEmbeddingProgress(event) {
+        events.push(`embedding:${event.current_batch}/${event.total_batches}`);
+      },
+    });
+
+    expect(result.filename).toBe("guide.pdf");
+    expect(result.embedding_count).toBe(6);
+    expect(events).toEqual([
+      "stage:upload_received",
+      "stage:parsing_pdf",
+      "embedding:1/2",
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/upload/stream",
       expect.objectContaining({
         method: "POST",
       }),

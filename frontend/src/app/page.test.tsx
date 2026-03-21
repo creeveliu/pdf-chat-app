@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import Home from "@/app/page";
-import { askQuestionStream, uploadPdf } from "@/lib/api";
+import { askQuestionStream, uploadPdfStream } from "@/lib/api";
 
 
 vi.mock("@/lib/api", async () => {
@@ -9,12 +9,12 @@ vi.mock("@/lib/api", async () => {
 
   return {
     ...actual,
-    uploadPdf: vi.fn(),
+    uploadPdfStream: vi.fn(),
     askQuestionStream: vi.fn(),
   };
 });
 
-const mockedUploadPdf = vi.mocked(uploadPdf);
+const mockedUploadPdfStream = vi.mocked(uploadPdfStream);
 const mockedAskQuestionStream = vi.mocked(askQuestionStream);
 
 describe("Home streaming chat", () => {
@@ -24,7 +24,7 @@ describe("Home streaming chat", () => {
       continueStream = resolve;
     });
 
-    mockedUploadPdf.mockResolvedValue({
+    mockedUploadPdfStream.mockResolvedValue({
       document_id: "doc-1",
       already_exists: false,
       filename: "guide.pdf",
@@ -99,6 +99,46 @@ describe("Home streaming chat", () => {
     });
   });
 
+  it("shows granular upload stages instead of one long uploading state", async () => {
+    mockedUploadPdfStream.mockImplementation(async (_file, handlers) => {
+      handlers.onStage?.({ stage: "upload_received", filename: "guide.pdf" });
+      handlers.onStage?.({ stage: "parsing_pdf", filename: "guide.pdf" });
+      handlers.onStage?.({ stage: "chunking", filename: "guide.pdf", page_count: 12 });
+      handlers.onStage?.({ stage: "generating_embeddings", filename: "guide.pdf", chunk_count: 6 });
+      handlers.onEmbeddingProgress?.({
+        current_batch: 1,
+        total_batches: 2,
+        completed_chunks: 3,
+        total_chunks: 6,
+      });
+
+      return {
+        document_id: "doc-1",
+        already_exists: false,
+        filename: "guide.pdf",
+        text_length: 1200,
+        page_count: 12,
+        preview: "preview",
+        chunk_count: 6,
+        indexed_new_chunks: 6,
+        embedding_count: 6,
+      };
+    });
+
+    const { container } = render(<Home />);
+    const file = new File(["pdf"], "guide.pdf", { type: "application/pdf" });
+    const fileInput = container.querySelector('input[type="file"]');
+    expect(fileInput).not.toBeNull();
+
+    fireEvent.change(fileInput as HTMLInputElement, {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "上传 PDF" }));
+
+    await screen.findByText("正在生成向量（第 1 / 2 批，3 / 6 个片段）...");
+    await screen.findByText("上传完成：guide.pdf");
+  });
+
   it("keeps the chat column height constrained so the message list can scroll internally", () => {
     const { container } = render(<Home />);
 
@@ -129,5 +169,32 @@ describe("Home streaming chat", () => {
     expect(headerSection).toHaveClass("px-5", "py-4");
     expect(title).toHaveClass("text-3xl");
     expect(currentDocumentCard).toHaveClass("px-3.5", "py-2.5");
+  });
+
+  it("accepts a dropped PDF on the upload card and updates the selected filename", () => {
+    render(<Home />);
+
+    const uploadCard = screen.getByText("选择 PDF 文件").closest("label");
+    expect(uploadCard).not.toBeNull();
+
+    const file = new File(["pdf"], "dropped-guide.pdf", { type: "application/pdf" });
+
+    fireEvent.dragOver(uploadCard as HTMLElement, {
+      dataTransfer: {
+        files: [file],
+        items: [{ kind: "file", type: "application/pdf", getAsFile: () => file }],
+        types: ["Files"],
+      },
+    });
+
+    fireEvent.drop(uploadCard as HTMLElement, {
+      dataTransfer: {
+        files: [file],
+        items: [{ kind: "file", type: "application/pdf", getAsFile: () => file }],
+        types: ["Files"],
+      },
+    });
+
+    expect(screen.getByText("dropped-guide.pdf")).toBeInTheDocument();
   });
 });

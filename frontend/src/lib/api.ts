@@ -10,6 +10,32 @@ export type UploadResponse = {
   indexed_new_chunks?: number;
 };
 
+export type UploadStageEvent = {
+  stage:
+    | "upload_received"
+    | "reusing_index"
+    | "parsing_pdf"
+    | "chunking"
+    | "generating_embeddings"
+    | "persisting_index";
+  filename?: string;
+  page_count?: number;
+  chunk_count?: number;
+  document_id?: string;
+};
+
+export type UploadEmbeddingProgressEvent = {
+  current_batch: number;
+  total_batches: number;
+  completed_chunks: number;
+  total_chunks: number;
+};
+
+export type UploadStreamHandlers = {
+  onStage?: (event: UploadStageEvent) => void;
+  onEmbeddingProgress?: (event: UploadEmbeddingProgressEvent) => void;
+};
+
 export type AskContext = {
   document_id: string;
   filename: string;
@@ -102,6 +128,97 @@ export async function uploadPdf(file: File): Promise<UploadResponse> {
   }
 
   return (await response.json()) as UploadResponse;
+}
+
+export async function uploadPdfStream(
+  file: File,
+  handlers: UploadStreamHandlers,
+): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}/upload/stream`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch {
+    throw new Error("无法连接后端。请确认 FastAPI 服务已经启动。");
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+
+  if (!response.body) {
+    throw new Error("浏览器不支持流式响应，无法接收上传进度。");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let donePayload: UploadResponse | null = null;
+
+  function handleBlock(block: string) {
+    const parsed = parseSseBlock(block);
+    if (!parsed) {
+      return;
+    }
+
+    const payload = JSON.parse(parsed.data) as
+      | UploadStageEvent
+      | UploadEmbeddingProgressEvent
+      | UploadResponse
+      | { detail?: string };
+
+    if (parsed.event === "stage") {
+      handlers.onStage?.(payload as UploadStageEvent);
+      return;
+    }
+
+    if (parsed.event === "embedding_progress") {
+      handlers.onEmbeddingProgress?.(payload as UploadEmbeddingProgressEvent);
+      return;
+    }
+
+    if (parsed.event === "done") {
+      donePayload = payload as UploadResponse;
+      return;
+    }
+
+    if (parsed.event === "error") {
+      const message = (payload as { detail?: string }).detail;
+      throw new Error(message || "上传失败。");
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+
+    let delimiterIndex = buffer.indexOf("\n\n");
+    while (delimiterIndex >= 0) {
+      const block = buffer.slice(0, delimiterIndex);
+      buffer = buffer.slice(delimiterIndex + 2);
+      handleBlock(block);
+      delimiterIndex = buffer.indexOf("\n\n");
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (buffer.trim()) {
+    handleBlock(buffer);
+  }
+
+  if (!donePayload) {
+    throw new Error("上传进度流提前结束，未收到完成结果。");
+  }
+
+  return donePayload;
 }
 
 export async function askQuestion(
