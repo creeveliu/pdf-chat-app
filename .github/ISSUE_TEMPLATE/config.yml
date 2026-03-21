@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security issue reporting
+    url: https://github.com/creeveliu/pdf-chat-app/blob/main/SECURITY.md
+    about: Please review the private reporting guidance before disclosing a security issue.
+  - name: Project setup and usage
+    url: https://github.com/creeveliu/pdf-chat-app/blob/main/README.md
+    about: Read the README for local setup, runtime data notes, and verification commands.

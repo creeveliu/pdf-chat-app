@@ -1,103 +1,151 @@
 # PDF Chat App
 
-一个用于上传 PDF 并基于文档内容进行 AI 问答的 Web 应用。当前仓库采用 monorepo 结构，前端与后端分离，便于并行开发和后续持续迭代。
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688)
+![React](https://img.shields.io/badge/React-19-149ECA)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB)
 
-## UI Preview
+中文 | English
 
-<img width="3742" height="1924" alt="PDF Chat App UI Preview" src="https://github.com/user-attachments/assets/6fb15b46-8a5e-4bfd-93eb-838cae5ec5e7" />
+一个用于上传 PDF、建立向量索引，并围绕当前文档进行连续问答的 Web 应用。
+
+PDF Chat App is a monorepo web application for uploading PDFs, building vector indexes, and asking follow-up questions scoped to the current document.
+
+## Features
+
+- 上传 PDF 后自动解析文本、切分 chunk、生成 embedding，并写入 FAISS 索引
+- 基于文件内容 `SHA-256` 做文档级去重，重复上传时复用已有索引
+- 问答默认限定在当前 `document_id` 下，避免多文档互相污染
+- 前端采用聊天式界面，支持多轮提问、流式回答和 Markdown 渲染
+- 每条 AI 回答都返回引用上下文与页码信息，便于查看来源片段
+
+- Automatic PDF parsing, chunking, embedding generation, and FAISS index persistence
+- Document-level deduplication using file-content `SHA-256`
+- Question answering scoped to the current `document_id`
+- Chat-style frontend with streaming answers and Markdown rendering
+- Citation metadata with page references and retrieved context snippets
+
+## Screenshot
+
+![PDF Chat App overview](docs/images/app-overview.png)
 
 ## Tech Stack
 
 - Frontend: Next.js 16, React 19, Tailwind CSS 4, TypeScript
 - Backend: FastAPI, Uvicorn, Python 3.10
-- Repo: Monorepo, Git
+- Vector store: FAISS
+- PDF parsing: PyMuPDF
+- LLM / embeddings: OpenAI-compatible APIs, currently configured for DashScope compatibility
 
-## Current Progress
-
-- [x] Monorepo 仓库初始化完成
-- [x] Next.js 前端脚手架完成
-- [x] FastAPI 后端脚手架完成
-- [x] 前后端本地启动验证完成
-- [x] PDF 上传接口
-- [x] PDF 文件本地存储与解析
-- [x] 文本 chunking
-- [x] Embedding 生成
-- [x] FAISS 向量索引落盘
-- [x] 阿里百炼 OpenAI 兼容 embedding 支持
-- [x] 检索接口
-- [x] AI 问答链路
-- [x] 前端上传表单接入
-- [x] 前端提问与回答展示
-- [x] 引用片段展示
-- [x] 当前上传 PDF 作用域问答
-- [x] 同一 PDF 内容哈希去重与索引复用
-- [x] chunk metadata 与页码引用
-- [x] 聊天式前端界面
-- [x] 前端消息历史与引用展开
-- [x] `/ask/stream` 流式回答接口
-- [x] 前端流式消息渲染与最终引用补齐
-- [x] 聊天自动跟随与手动滚动不抢焦点
-- [x] 聊天布局压缩与浅色输入区优化
-- [x] AI 聊天气泡支持 Markdown 渲染
-
-## Project Structure
+## Repository Structure
 
 ```text
 pdf-chat-app/
-├── frontend/   # Next.js frontend
-│   ├── src/components/  # Upload, chat, citations UI
-│   ├── src/lib/         # Frontend API wrappers
-│   ├── src/types/       # Frontend chat/domain types
-│   └── src/test/        # Frontend test setup
-├── backend/    # FastAPI backend
-│   ├── app/routes/    # FastAPI routes
-│   ├── app/services/  # PDF processing, dedupe, retrieval, QA
-│   ├── data/uploads/  # Local uploaded PDF storage
-│   └── data/index/    # FAISS indexes, chunk metadata, registry
-├── README.md
-└── AGENTS.md
+├── frontend/              # Next.js frontend
+│   ├── src/app/           # App routes and page entry
+│   ├── src/components/    # Chat, upload, citation UI
+│   ├── src/lib/           # API wrappers and client utilities
+│   ├── src/types/         # Frontend domain types
+│   └── src/test/          # Frontend test setup
+├── backend/               # FastAPI backend
+│   ├── app/main.py        # App initialization and router registration
+│   ├── app/routes/        # HTTP routes
+│   ├── app/services/      # PDF, retrieval, embedding, QA services
+│   ├── data/uploads/      # Runtime PDF storage
+│   ├── data/index/        # Runtime FAISS indexes and document registry
+│   └── tests/             # Backend tests
+├── AGENTS.md              # Internal agent guidance for this repository
+└── README.md
 ```
 
-## Run Locally
+## Requirements
 
-### Frontend
+- Node.js 20+ and npm
+- Python 3.10+
+- A valid embedding API key
+- A valid LLM API key if you want answer generation
+
+## Quick Start
+
+### 1. Clone the repository
 
 ```bash
-cd frontend
-npm run dev
+git clone <your-repo-url>
+cd pdf-chat-app
 ```
 
-默认地址：`http://localhost:3000`
-
-前端环境变量：
-
-```bash
-cd frontend
-cp .env.example .env.local
-```
-
-默认内容：
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
-```
-
-### Backend
+### 2. Start the backend
 
 ```bash
 cd backend
-.venv/bin/uvicorn app.main:app --reload
+python3.10 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload
 ```
 
-默认地址：`http://127.0.0.1:8000`
+默认地址 / Default URL: `http://127.0.0.1:8000`
 
-健康检查：
+健康检查 / Health check:
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-上传 PDF：
+### 3. Start the frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+默认地址 / Default URL: `http://localhost:3000`
+
+## Environment Variables
+
+前端和后端都只应提交 `.env.example`，不要提交真实 `.env` 文件。
+
+Commit only `.env.example` files. Real `.env` files must stay untracked.
+
+### Backend
+
+Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and fill in real values:
+
+```env
+EMBEDDING_PROVIDER=dashscope
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+EMBEDDING_MODEL=text-embedding-v4
+EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_PROVIDER=dashscope
+LLM_MODEL=qwen-plus
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+```
+
+说明 / Notes:
+
+- 如果使用 DashScope，可同时复用 `DASHSCOPE_API_KEY` 作为 embedding 和 LLM 的密钥来源
+- 如果切换到 OpenAI-compatible provider，请根据 `backend/app/services/embedding.py` 和 `backend/app/services/llm.py` 中的规则设置 `OPENAI_API_KEY` 或 `LLM_API_KEY` / `EMBEDDING_API_KEY`
+- `/upload` 在当前实现里会立即做索引，因此 embedding 配置在上传前就必须可用
+
+- DashScope can be used as both the embedding and LLM provider through its OpenAI-compatible API
+- For other providers, configure the matching API key variables expected by the backend services
+- `/upload` immediately performs indexing, so embedding configuration must be valid before uploading files
+
+### Frontend
+
+Copy [`frontend/.env.example`](frontend/.env.example) to `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
+## Usage
+
+### Upload a PDF
 
 ```bash
 curl -X POST \
@@ -105,37 +153,64 @@ curl -X POST \
   http://127.0.0.1:8000/upload
 ```
 
-返回结果中会包含当前文档的 `document_id`，以及去重信息 `already_exists`、`indexed_new_chunks`。前端会自动保存这个值，并在后续提问时只检索这一次上传成功的 PDF。
+上传成功后会返回 `document_id`。前端会保存该值，并在后续提问时优先传给后端。
 
-基于已上传 PDF 提问：
+The upload response contains a `document_id`. The frontend stores it and sends it with follow-up questions.
+
+### Ask a question
 
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"question":"这份PDF主要讲了什么？","document_id":"<upload返回的document_id>","top_k":3}' \
+  -d '{"question":"这份 PDF 主要讲了什么？","document_id":"<document_id>","top_k":3}' \
   http://127.0.0.1:8000/ask
 ```
 
-说明：
-- 当后端只有一个索引文档时，`/ask` 可以不传 `document_id`
-- 当后端已经存在多个 PDF 索引时，必须传 `document_id`，否则后端会返回明确错误，避免把旧文档内容混入回答
-- `/ask` 返回的 `contexts` 已包含 `page_number`、`page_numbers`、`chunk_index` 等 metadata，`citations` 用于前端展示页码摘要
-
-流式提问：
+### Ask a question with streaming
 
 ```bash
 curl -N -X POST \
   -H "Content-Type: application/json" \
-  -d '{"question":"这份PDF主要讲了什么？","document_id":"<upload返回的document_id>","top_k":3}' \
+  -d '{"question":"这份 PDF 主要讲了什么？","document_id":"<document_id>","top_k":3}' \
   http://127.0.0.1:8000/ask/stream
 ```
 
-说明：
-- `/ask/stream` 使用 `text/event-stream` 返回 `start`、`delta`、`done`、`error` 事件
-- `done` 事件会一次性带上完整 `answer`、`contexts`、`citations` 和 `top_k`
-- 前端默认走流式接口，保留同步 `/ask` 作为兼容路径
+`/ask/stream` uses `text/event-stream` and emits `start`, `delta`, `done`, and `error` events.
 
-### Frontend Verification
+## Runtime Data and Persistence
+
+`backend/data/uploads/` 和 `backend/data/index/` 是运行时数据目录，不是源码目录。
+
+`backend/data/uploads/` and `backend/data/index/` are runtime data directories, not source artifacts.
+
+它们当前用于保存：
+
+- 上传后的 PDF 文件
+- FAISS 索引文件
+- chunk metadata
+- 文档注册表 `documents.json`
+
+They currently store:
+
+- uploaded PDFs
+- FAISS index files
+- chunk metadata
+- the document registry `documents.json`
+
+这意味着当前后端部署需要持久化磁盘。纯无状态、临时文件系统的 serverless 环境并不适合直接承载现有后端。
+
+This means the backend needs persistent storage in production. Purely stateless serverless environments are not a good fit for the current backend without architectural changes.
+
+## Verification
+
+### Backend
+
+```bash
+cd backend
+./.venv/bin/python -m pytest -q
+```
+
+### Frontend
 
 ```bash
 cd frontend
@@ -144,44 +219,42 @@ npm run lint
 npm run build
 ```
 
-当前前端体验：
-- 上传区域与聊天区分离
-- 连续多轮提问会保留消息历史
-- 回答会按流式片段逐步渲染，支持 Markdown 展示，并在完成后补齐引用信息
-- 发送新问题时会重新自动滚动到底部；用户手动滚动后，不会被后续流式输出强制拉回底部
-- 每条 AI 消息可展开查看引用片段、页码与 chunk 编号
-- 聊天区与输入区都已改为更紧凑的浅色布局，聊天头部也进一步压缩，桌面端首屏可视内容更多
-- 未上传文档前会禁用提问输入框
+## Known Limitations
 
-### Embedding Config
+- 当前默认问答语义是“围绕当前文档”，不是跨文档全局检索
+- 上传和索引为同步链路，大 PDF 处理时间会较长
+- 当前数据默认保存在本地磁盘，未接入对象存储或外部向量数据库
+- 后端生产部署仍需额外配置 CORS 和持久化存储
 
-`/upload` 在当前实现里会立即做 chunk、embedding 和 FAISS 建索引，因此需要先配置 embedding provider。
+- The default query scope is the current document, not cross-document retrieval
+- Uploading and indexing are synchronous, so large PDFs take longer to process
+- Runtime data is still stored on local disk
+- Production deployment still requires CORS and persistent storage configuration
 
-如果使用阿里百炼：
+## Roadmap
 
-1. 复制配置模板
-```bash
-cd backend
-cp .env.example .env
-```
+- 优化聊天界面的移动端体验与输入交互
+- 增加多文档列表、切换或历史上传记录
+- 改善引用片段的去重、排序、折叠和阅读体验
+- 增加更清晰的错误提示、空态提示和交互反馈
 
-2. 在 `backend/.env` 中填写：
-```env
-EMBEDDING_PROVIDER=dashscope
-DASHSCOPE_API_KEY=你的阿里百炼API Key
-EMBEDDING_MODEL=text-embedding-v4
-EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-```
+- Improve mobile chat layout and input experience
+- Add document list, document switching, or upload history
+- Improve citation deduplication, sorting, collapsing, and readability
+- Add clearer error, empty-state, and interaction feedback
 
-说明：
-- 当前后端应使用百炼官方 OpenAI 兼容 embedding 地址 `https://dashscope.aliyuncs.com/compatible-mode/v1`
-- 不建议使用截图里的 `https://coding.dashscope.aliyuncs.com/v1` 作为 embedding 接口地址
-- 百炼 embedding 接口当前实现按每批最多 `10` 条输入发送请求，避免兼容层的批量限制
+## Contributing
 
-## Next Plan
+欢迎提交 issue 和 PR。开始之前请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
-1. 优化聊天界面的移动端体验与排版细节
-2. 增加多文档切换或文档列表选择能力
-3. 改善引用片段去重、排序和折叠体验
-4. 增加历史问题持久化或会话恢复能力
-5. 增加检索调试信息与更细致的错误提示
+Issues and pull requests are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before contributing.
+
+## Security
+
+如果你发现了安全问题，请不要直接公开提交 issue，请参考 [`SECURITY.md`](SECURITY.md)。
+
+If you find a security issue, please do not open a public issue first. See [`SECURITY.md`](SECURITY.md).
+
+## License
+
+This project is licensed under the MIT License. See [`LICENSE`](LICENSE).

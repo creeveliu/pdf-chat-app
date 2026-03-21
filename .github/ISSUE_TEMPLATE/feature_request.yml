@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose an improvement or new capability
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the problem first, then the change you want.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem or limitation are you trying to solve?
+      placeholder: The current workflow makes it hard to ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the change you want to see.
+      placeholder: Add ...
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and constraints
+      description: Mention affected areas, assumptions, or things that should not change.
+      placeholder: Keep document_id scoping, preserve streaming UI, avoid broad refactors.
+
