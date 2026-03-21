@@ -32,7 +32,7 @@ def ensure_index_root() -> Path:
     try:
         INDEX_ROOT.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise VectorStoreError("Could not create index directory.") from exc
+        raise VectorStoreError("无法创建索引目录。") from exc
 
     return INDEX_ROOT
 
@@ -50,10 +50,10 @@ def persist_document_index(
     embeddings: list[list[float]],
 ) -> VectorStoreArtifacts:
     if not chunks or not embeddings:
-        raise ValueError("Chunks and embeddings are required to build an index.")
+        raise ValueError("建立索引时必须提供 chunks 和 embeddings。")
 
     if len(chunks) != len(embeddings):
-        raise ValueError("Chunk count and embedding count must match.")
+        raise ValueError("chunk 数量和 embedding 数量必须一致。")
 
     try:
         document_dir = ensure_index_root() / document_id
@@ -89,7 +89,7 @@ def persist_document_index(
             encoding="utf-8",
         )
     except (OSError, RuntimeError, ValueError) as exc:
-        raise VectorStoreError("Failed to persist FAISS index and chunks.") from exc
+        raise VectorStoreError("保存 FAISS 索引和分块数据失败。") from exc
 
     logger.info(
         "Persisted vector index for %s at %s with %s chunks",

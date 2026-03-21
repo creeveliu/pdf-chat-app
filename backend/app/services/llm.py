@@ -43,7 +43,7 @@ def get_llm_settings() -> LlmSettings:
 
     if not api_key:
         env_name = "DASHSCOPE_API_KEY" if resolved_provider == "dashscope" else "OPENAI_API_KEY"
-        raise LlmServiceError(f"{env_name} is required to generate answers.")
+        raise LlmServiceError(f"缺少环境变量 {env_name}，无法生成回答。")
 
     return LlmSettings(
         provider=resolved_provider,
@@ -105,7 +105,7 @@ def generate_answer(question: str, contexts: list[dict[str, object]]) -> str:
         answer = (response.choices[0].message.content or "").strip()
     except Exception as exc:
         logger.exception("LLM request failed for provider=%s", settings.provider)
-        raise LlmServiceError(f"Failed to generate answer from {settings.provider}.") from exc
+        raise LlmServiceError(f"调用 {settings.provider} 生成回答失败。") from exc
 
     return answer or FALLBACK_ANSWER
 
@@ -143,4 +143,4 @@ def stream_answer(question: str, contexts: list[dict[str, object]]) -> Iterator[
             yield FALLBACK_ANSWER
     except Exception as exc:
         logger.exception("Streaming LLM request failed for provider=%s", settings.provider)
-        raise LlmServiceError(f"Failed to generate answer from {settings.provider}.") from exc
+        raise LlmServiceError(f"调用 {settings.provider} 生成回答失败。") from exc

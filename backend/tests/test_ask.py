@@ -64,14 +64,14 @@ def test_ask_rejects_empty_question() -> None:
     response = client.post("/ask", json={"question": "   "})
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "Question cannot be empty."}
+    assert response.json() == {"detail": "问题不能为空。"}
 
 
 def test_ask_returns_error_when_no_index_exists() -> None:
     response = client.post("/ask", json={"question": "这份 PDF 讲了什么？"})
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "No vector index available. Upload a PDF first."}
+    assert response.json() == {"detail": "当前没有可用索引，请先上传 PDF。"}
 
 
 def test_ask_returns_answer_and_contexts(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -165,7 +165,7 @@ def test_ask_stream_rejects_empty_question() -> None:
     response = client.post("/ask/stream", json={"question": "   "})
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "Question cannot be empty."}
+    assert response.json() == {"detail": "问题不能为空。"}
 
 
 def test_ask_skips_incompatible_legacy_index(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -228,9 +228,7 @@ def test_ask_requires_document_id_when_multiple_indexes_exist(monkeypatch: pytes
     response = client.post("/ask", json={"question": "这份 PDF 主要讲了什么？"})
 
     assert response.status_code == 400
-    assert response.json() == {
-        "detail": "Multiple indexed PDFs are available. Specify document_id to ask about a specific file."
-    }
+    assert response.json() == {"detail": "当前已有多份已索引的 PDF，请传入 document_id 后再提问。"}
 
 
 def test_ask_deduplicates_contexts_after_duplicate_upload(monkeypatch: pytest.MonkeyPatch) -> None:

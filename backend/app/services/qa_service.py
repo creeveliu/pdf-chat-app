@@ -52,10 +52,10 @@ def build_citations(contexts: list[dict[str, object]]) -> list[dict[str, object]
 def ask_question(question: str, top_k: int = 3, document_id: str | None = None) -> AskResponse:
     normalized_question = question.strip()
     if not normalized_question:
-        raise QuestionValidationError("Question cannot be empty.")
+        raise QuestionValidationError("问题不能为空。")
 
     if top_k <= 0:
-        raise QuestionValidationError("top_k must be greater than 0.")
+        raise QuestionValidationError("top_k 必须大于 0。")
 
     retrieved = retrieval.retrieve_contexts(
         normalized_question,
@@ -95,10 +95,10 @@ def stream_question(
 ) -> Iterator[StreamDeltaEvent]:
     normalized_question = question.strip()
     if not normalized_question:
-        raise QuestionValidationError("Question cannot be empty.")
+        raise QuestionValidationError("问题不能为空。")
 
     if top_k <= 0:
-        raise QuestionValidationError("top_k must be greater than 0.")
+        raise QuestionValidationError("top_k 必须大于 0。")
 
     retrieved = retrieval.retrieve_contexts(
         normalized_question,

@@ -1,4 +1,5 @@
 from io import BytesIO
+import json
 from pathlib import Path
 
 import fitz
@@ -31,7 +32,16 @@ def isolate_upload_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def fake_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _generate_embeddings(chunks: list[str]) -> list[list[float]]:
+    def _generate_embeddings(chunks: list[str], progress_callback=None) -> list[list[float]]:
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "current_batch": 1,
+                    "total_batches": 1,
+                    "completed_chunks": len(chunks),
+                    "total_chunks": len(chunks),
+                }
+            )
         return [[float(index + 1), float(len(chunk)), 0.5] for index, chunk in enumerate(chunks)]
 
     monkeypatch.setattr(embedding, "generate_embeddings", _generate_embeddings)
@@ -111,4 +121,162 @@ def test_upload_rejects_non_pdf_file() -> None:
     )
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "Only PDF files are supported."}
+    assert response.json() == {"detail": "仅支持上传 PDF 文件。"}
+
+
+def test_upload_rejects_pdf_when_extracted_text_exceeds_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    oversized_text = "A" * (pdf_service.MAX_EXTRACTED_TEXT_LENGTH + 1)
+
+    monkeypatch.setattr(
+        pdf_service,
+        "extract_pdf_content",
+        lambda _: ([oversized_text], oversized_text, 1),
+    )
+
+    response = client.post(
+        "/upload",
+        files={"file": ("oversized.pdf", BytesIO(build_pdf_bytes("placeholder")), "application/pdf")},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": (
+            f"提取出的文本过长，无法建立索引（当前 {len(oversized_text)} 个字符，限制为 "
+            f"{pdf_service.MAX_EXTRACTED_TEXT_LENGTH} 个字符）。"
+        )
+    }
+    assert len(list((vector_store.INDEX_ROOT).glob("*/faiss.index"))) == 0
+    assert len(list((vector_store.INDEX_ROOT).glob("*/chunks.json"))) == 0
+
+
+def _parse_sse_events(payload: str) -> list[tuple[str, dict]]:
+    events: list[tuple[str, dict]] = []
+    blocks = [block for block in payload.split("\n\n") if block.strip()]
+    for block in blocks:
+        event_name = ""
+        data = ""
+        for line in block.splitlines():
+            if line.startswith("event:"):
+                event_name = line.split(":", 1)[1].strip()
+            if line.startswith("data:"):
+                data = line.split(":", 1)[1].strip()
+        assert event_name
+        assert data
+        events.append((event_name, json.loads(data)))
+    return events
+
+
+def test_upload_stream_returns_staged_progress_and_done_payload() -> None:
+    pdf_bytes = build_pdf_bytes(("Streaming upload should emit progress. " * 60).strip(), page_count=3)
+
+    with client.stream(
+        "POST",
+        "/upload/stream",
+        files={"file": ("sample.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    ) as response:
+        assert response.status_code == 200
+        payload = response.read().decode("utf-8")
+
+    events = _parse_sse_events(payload)
+    assert [event_name for event_name, _ in events] == [
+        "stage",
+        "stage",
+        "stage",
+        "stage",
+        "embedding_progress",
+        "stage",
+        "done",
+    ]
+
+    stage_payloads = [event for event_name, event in events if event_name == "stage"]
+    assert [event["stage"] for event in stage_payloads] == [
+        "upload_received",
+        "parsing_pdf",
+        "chunking",
+        "generating_embeddings",
+        "persisting_index",
+    ]
+
+    done_payload = events[-1][1]
+    assert done_payload["filename"] == "sample.pdf"
+    assert done_payload["page_count"] == 3
+    assert done_payload["chunk_count"] > 1
+
+
+def test_upload_stream_emits_embedding_batch_progress_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf_bytes = build_pdf_bytes(("Embedding progress should include batch metadata. " * 80).strip(), page_count=4)
+
+    def _generate_embeddings(chunks: list[str], progress_callback=None) -> list[list[float]]:
+        midpoint = max(len(chunks) // 2, 1)
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "current_batch": 1,
+                    "total_batches": 2,
+                    "completed_chunks": midpoint,
+                    "total_chunks": len(chunks),
+                }
+            )
+            progress_callback(
+                {
+                    "current_batch": 2,
+                    "total_batches": 2,
+                    "completed_chunks": len(chunks),
+                    "total_chunks": len(chunks),
+                }
+            )
+        return [[float(index + 1), float(len(chunk)), 0.5] for index, chunk in enumerate(chunks)]
+
+    monkeypatch.setattr(embedding, "generate_embeddings", _generate_embeddings)
+
+    with client.stream(
+        "POST",
+        "/upload/stream",
+        files={"file": ("sample.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    ) as response:
+        assert response.status_code == 200
+        events = _parse_sse_events(response.read().decode("utf-8"))
+
+    embedding_events = [event for event_name, event in events if event_name == "embedding_progress"]
+    assert len(embedding_events) == 2
+    assert embedding_events[0]["current_batch"] == 1
+    assert embedding_events[0]["total_batches"] == 2
+    assert embedding_events[1]["current_batch"] == 2
+    assert embedding_events[1]["total_batches"] == 2
+    assert embedding_events[-1]["completed_chunks"] == embedding_events[-1]["total_chunks"]
+
+
+def test_upload_stream_emits_error_when_extracted_text_exceeds_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    oversized_text = "A" * (pdf_service.MAX_EXTRACTED_TEXT_LENGTH + 1)
+
+    monkeypatch.setattr(
+        pdf_service,
+        "extract_pdf_content",
+        lambda _: ([oversized_text], oversized_text, 1),
+    )
+
+    with client.stream(
+        "POST",
+        "/upload/stream",
+        files={"file": ("oversized.pdf", BytesIO(build_pdf_bytes("placeholder")), "application/pdf")},
+    ) as response:
+        assert response.status_code == 200
+        events = _parse_sse_events(response.read().decode("utf-8"))
+
+    assert [event_name for event_name, _ in events] == ["stage", "stage", "error"]
+    assert [event["stage"] for event_name, event in events if event_name == "stage"] == [
+        "upload_received",
+        "parsing_pdf",
+    ]
+    assert events[-1][1] == {
+        "detail": (
+            f"提取出的文本过长，无法建立索引（当前 {len(oversized_text)} 个字符，限制为 "
+            f"{pdf_service.MAX_EXTRACTED_TEXT_LENGTH} 个字符）。"
+        )
+    }

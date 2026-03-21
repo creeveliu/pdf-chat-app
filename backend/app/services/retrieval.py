@@ -40,7 +40,7 @@ def _load_index_payload(document_dir) -> tuple[faiss.Index, dict]:
     chunks_path = document_dir / "chunks.json"
 
     if not index_path.exists() or not chunks_path.exists():
-        raise RetrievalError("No vector index available. Upload a PDF first.")
+        raise RetrievalError("当前没有可用索引，请先上传 PDF。")
 
     index = faiss.read_index(str(index_path))
     payload = json.loads(chunks_path.read_text(encoding="utf-8"))
@@ -51,17 +51,17 @@ def _resolve_document_dirs(document_id: str | None) -> list:
     index_root = vector_store.ensure_index_root()
     document_dirs = [path for path in index_root.iterdir() if path.is_dir()]
     if not document_dirs:
-        raise RetrievalError("No vector index available. Upload a PDF first.")
+        raise RetrievalError("当前没有可用索引，请先上传 PDF。")
 
     if document_id:
         document_dir = index_root / document_id
         if not document_dir.is_dir():
-            raise RetrievalError("No vector index found for the specified document_id.")
+            raise RetrievalError("未找到指定 document_id 对应的向量索引。")
         return [document_dir]
 
     if len(document_dirs) > 1:
         raise DocumentSelectionError(
-            "Multiple indexed PDFs are available. Specify document_id to ask about a specific file."
+            "当前已有多份已索引的 PDF，请传入 document_id 后再提问。"
         )
 
     return document_dirs
@@ -169,10 +169,10 @@ def retrieve_contexts(
             )
 
     if not compatible_index_found:
-        raise RetrievalError("No compatible vector index available. Re-upload the PDF to rebuild the index.")
+        raise RetrievalError("当前没有兼容的向量索引，请重新上传 PDF 以重建索引。")
 
     if not matches:
-        raise RetrievalError("No vector index available. Upload a PDF first.")
+        raise RetrievalError("当前没有可用索引，请先上传 PDF。")
 
     selected = _deduplicate_matches(matches, top_k=top_k)
     logger.info("Retrieved %s contexts for question", len(selected))

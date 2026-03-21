@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import math
 import os
-from typing import Iterable
+from typing import Callable, Iterable
 
 from openai import OpenAI
 
@@ -48,7 +49,7 @@ def get_embedding_settings() -> EmbeddingSettings:
 
     if not api_key:
         env_name = "DASHSCOPE_API_KEY" if resolved_provider == "dashscope" else "OPENAI_API_KEY"
-        raise EmbeddingServiceError(f"{env_name} is required to generate embeddings.")
+        raise EmbeddingServiceError(f"缺少环境变量 {env_name}，无法生成向量。")
 
     return EmbeddingSettings(
         provider=resolved_provider,
@@ -71,7 +72,10 @@ def get_batch_size(settings: EmbeddingSettings) -> int:
     return BATCH_SIZE
 
 
-def generate_embeddings(chunks: list[str]) -> list[list[float]]:
+def generate_embeddings(
+    chunks: list[str],
+    progress_callback: Callable[[dict[str, int]], None] | None = None,
+) -> list[list[float]]:
     if not chunks:
         return []
 
@@ -88,18 +92,35 @@ def generate_embeddings(chunks: list[str]) -> list[list[float]]:
         client = build_embedding_client(settings)
         embeddings: list[list[float]] = []
         batch_size = get_batch_size(settings)
+        total_batches = math.ceil(len(chunks) / batch_size)
 
-        for batch in _batched(chunks, batch_size):
+        for batch_index, batch in enumerate(_batched(chunks, batch_size), start=1):
             response = client.embeddings.create(
                 input=batch,
                 model=settings.model,
             )
             embeddings.extend(item.embedding for item in response.data)
+            if progress_callback is not None:
+                progress_callback(
+                    {
+                        "current_batch": batch_index,
+                        "total_batches": total_batches,
+                        "completed_chunks": len(embeddings),
+                        "total_chunks": len(chunks),
+                    }
+                )
     except Exception as exc:
         logger.exception("Embedding request failed for provider=%s", settings.provider)
         raise EmbeddingServiceError(
-            f"Failed to generate embeddings from {settings.provider}."
+            f"调用 {settings.provider} 生成向量失败。"
         ) from exc
 
     logger.info("Generated %s embeddings", len(embeddings))
     return embeddings
+
+
+def generate_embeddings_with_progress(
+    chunks: list[str],
+    progress_callback: Callable[[dict[str, int]], None] | None = None,
+) -> list[list[float]]:
+    return generate_embeddings(chunks, progress_callback=progress_callback)

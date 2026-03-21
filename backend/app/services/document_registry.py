@@ -49,7 +49,7 @@ def load_registry() -> dict[str, RegisteredDocument]:
     try:
         payload = json.loads(registry_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise DocumentRegistryError("Failed to read document registry.") from exc
+        raise DocumentRegistryError("读取文档注册表失败。") from exc
 
     documents = payload.get("documents", {})
     return {
@@ -80,7 +80,7 @@ def save_document(document: RegisteredDocument) -> RegisteredDocument:
             encoding="utf-8",
         )
     except OSError as exc:
-        raise DocumentRegistryError("Failed to persist document registry.") from exc
+        raise DocumentRegistryError("保存文档注册表失败。") from exc
 
     logger.info(
         "Registered document %s for hash %s",
