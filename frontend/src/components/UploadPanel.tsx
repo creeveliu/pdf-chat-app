@@ -1,3 +1,5 @@
+import { useState, type DragEvent } from "react";
+
 import type { UploadResponse } from "@/lib/api";
 
 type UploadPanelProps = {
@@ -19,11 +21,60 @@ export function UploadPanel({
   onFileChange,
   onUpload,
 }: UploadPanelProps) {
+  const [isDragActive, setIsDragActive] = useState(false);
+
   const uploadSummary = uploadResult
     ? uploadResult.already_exists
       ? "复用已有索引"
       : "新建索引完成"
     : null;
+
+  function isPdfFile(file: File): boolean {
+    return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  }
+
+  function hasDraggedFiles(event: DragEvent<HTMLLabelElement>): boolean {
+    return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
+    if (!hasDraggedFiles(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsDragActive(true);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLLabelElement>) {
+    if (!hasDraggedFiles(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDragActive(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLLabelElement>) {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      return;
+    }
+
+    setIsDragActive(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    if (!hasDraggedFiles(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsDragActive(false);
+
+    const droppedFile = event.dataTransfer.files?.[0] ?? null;
+    onFileChange(droppedFile && isPdfFile(droppedFile) ? droppedFile : null);
+  }
 
   return (
     <section className="self-start rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl shadow-slate-200/80 backdrop-blur">
@@ -38,8 +89,21 @@ export function UploadPanel({
           </p>
         </div>
 
-        <label className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 transition hover:border-sky-400 hover:bg-sky-50/60">
+        <label
+          className={`flex cursor-pointer flex-col gap-2 rounded-2xl border border-dashed p-4 text-sm text-slate-600 transition ${
+            isDragActive
+              ? "border-sky-500 bg-sky-50 text-sky-700 shadow-[0_0_0_3px_rgba(14,165,233,0.12)]"
+              : "border-slate-300 bg-slate-50 hover:border-sky-400 hover:bg-sky-50/60"
+          }`}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
           <span className="font-medium text-slate-900">选择 PDF 文件</span>
+          <span className={isDragActive ? "text-sky-700" : "text-slate-500"}>
+            {isDragActive ? "松开鼠标以选中这个 PDF。" : "点击选择，或把 PDF 拖到这里。"}
+          </span>
           <span className="truncate">{fileName || "还没有选择文件。"}</span>
           <input
             className="hidden"
@@ -58,9 +122,11 @@ export function UploadPanel({
             onClick={onUpload}
             type="button"
           >
-            {isUploading ? "上传中..." : "上传 PDF"}
+            {isUploading ? "处理中..." : "上传 PDF"}
           </button>
-          <span className="text-sm text-slate-500">{uploadStatus}</span>
+          <span aria-live="polite" className="text-sm text-slate-500">
+            {uploadStatus}
+          </span>
         </div>
 
         {uploadError ? (
