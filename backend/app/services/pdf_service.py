@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from pathlib import Path
+import re
 from uuid import uuid4
 
 import fitz
 from fastapi import UploadFile
 
+from app.services import chunking, embedding, vector_store
+
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = BACKEND_DIR / "data" / "uploads"
 PREVIEW_LENGTH = 1000
+
+logger = logging.getLogger(__name__)
 
 
 class ValidationError(Exception):
@@ -31,6 +37,8 @@ class PdfUploadResponse:
     text_length: int
     page_count: int
     preview: str
+    chunk_count: int
+    embedding_count: int
 
 
 def ensure_upload_dir() -> Path:
@@ -64,6 +72,12 @@ def build_storage_path(filename: str) -> Path:
     return ensure_upload_dir() / f"{uuid4().hex}_{safe_name}"
 
 
+def build_document_id(filename: str) -> str:
+    stem = Path(filename).stem.lower()
+    safe_stem = re.sub(r"[^a-z0-9]+", "-", stem).strip("-") or "document"
+    return f"{safe_stem}-{uuid4().hex}"
+
+
 def extract_pdf_text(file_path: Path) -> tuple[str, int]:
     try:
         document = fitz.open(file_path)
@@ -81,6 +95,7 @@ def extract_pdf_text(file_path: Path) -> tuple[str, int]:
 async def save_and_parse_pdf(file: UploadFile) -> PdfUploadResponse:
     file_bytes = await file.read()
     validate_pdf_upload(file.filename or "", file.content_type, file_bytes)
+    logger.info("Received upload: %s", file.filename)
 
     storage_path = build_storage_path(file.filename or "upload.pdf")
 
@@ -95,9 +110,29 @@ async def save_and_parse_pdf(file: UploadFile) -> PdfUploadResponse:
         storage_path.unlink(missing_ok=True)
         raise
 
+    chunks = chunking.chunk_text(text)
+    if not chunks:
+        raise PdfProcessingError("No extractable text was found in the uploaded PDF.")
+
+    embeddings = embedding.generate_embeddings(chunks)
+    document_id = build_document_id(file.filename or storage_path.name)
+    vector_store.persist_document_index(
+        document_id=document_id,
+        filename=file.filename or storage_path.name,
+        chunks=chunks,
+        embeddings=embeddings,
+    )
+    logger.info(
+        "Completed indexing for %s with %s chunks",
+        file.filename,
+        len(chunks),
+    )
+
     return PdfUploadResponse(
         filename=file.filename or storage_path.name,
         text_length=len(text),
         page_count=page_count,
         preview=text[:PREVIEW_LENGTH],
+        chunk_count=len(chunks),
+        embedding_count=len(embeddings),
     )

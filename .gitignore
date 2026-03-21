@@ -17,6 +17,8 @@ backend/.ruff_cache/
 backend/**/*.pyc
 backend/data/uploads/*
 !backend/data/uploads/.gitkeep
+backend/data/index/*
+!backend/data/index/.gitkeep
 
 # Editors / OS
 .idea/

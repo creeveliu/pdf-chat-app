@@ -1,6 +1,7 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
+from app.services.embedding import EmbeddingServiceError
 from app.services.pdf_service import (
     PdfProcessingError,
     PdfUploadResponse,
@@ -8,6 +9,7 @@ from app.services.pdf_service import (
     ValidationError,
     save_and_parse_pdf,
 )
+from app.services.vector_store import VectorStoreError
 
 router = APIRouter()
 
@@ -17,6 +19,8 @@ class UploadResponse(BaseModel):
     text_length: int
     page_count: int
     preview: str
+    chunk_count: int
+    embedding_count: int
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -37,6 +41,16 @@ async def upload_pdf(file: UploadFile = File(...)) -> UploadResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to store uploaded PDF.",
+        ) from exc
+    except EmbeddingServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except VectorStoreError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
         ) from exc
 
     return UploadResponse(**result.__dict__)

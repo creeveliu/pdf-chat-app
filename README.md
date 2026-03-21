@@ -16,6 +16,11 @@
 - [x] 前后端本地启动验证完成
 - [x] PDF 上传接口
 - [x] PDF 文件本地存储与解析
+- [x] 文本 chunking
+- [x] Embedding 生成
+- [x] FAISS 向量索引落盘
+- [x] 阿里百炼 OpenAI 兼容 embedding 支持
+- [ ] 检索接口
 - [ ] AI 问答链路
 - [ ] 前端上传表单接入
 - [ ] 聊天式前端交互
@@ -28,7 +33,8 @@ pdf-chat-app/
 ├── backend/    # FastAPI backend
 │   ├── app/routes/    # FastAPI routes
 │   ├── app/services/  # PDF processing and business logic
-│   └── data/uploads/  # Local uploaded PDF storage
+│   ├── data/uploads/  # Local uploaded PDF storage
+│   └── data/index/    # FAISS indexes and chunk metadata
 ├── README.md
 └── AGENTS.md
 ```
@@ -67,10 +73,35 @@ curl -X POST \
   http://127.0.0.1:8000/upload
 ```
 
+### Embedding Config
+
+`/upload` 在当前实现里会立即做 chunk、embedding 和 FAISS 建索引，因此需要先配置 embedding provider。
+
+如果使用阿里百炼：
+
+1. 复制配置模板
+```bash
+cd backend
+cp .env.example .env
+```
+
+2. 在 `backend/.env` 中填写：
+```env
+EMBEDDING_PROVIDER=dashscope
+DASHSCOPE_API_KEY=你的阿里百炼API Key
+EMBEDDING_MODEL=text-embedding-v4
+EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+```
+
+说明：
+- 当前后端应使用百炼官方 OpenAI 兼容 embedding 地址 `https://dashscope.aliyuncs.com/compatible-mode/v1`
+- 不建议使用截图里的 `https://coding.dashscope.aliyuncs.com/v1` 作为 embedding 接口地址
+- 百炼 embedding 接口当前实现按每批最多 `10` 条输入发送请求，避免兼容层的批量限制
+
 ## Next Plan
 
 1. 在 `frontend` 接入 PDF 上传表单和上传状态管理
 2. 为上传结果增加前端预览展示
-3. 定义问答 API，开始串联文档与问题输入
-4. 为后续 RAG 增加文本切分和索引准备层
+3. 增加检索接口，支持 query embedding + FAISS top-k
+4. 定义问答 API，开始串联文档与问题输入
 5. 在前端补齐聊天界面与联调流程
