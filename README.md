@@ -26,19 +26,25 @@
 - [x] 前端提问与回答展示
 - [x] 引用片段展示
 - [x] 当前上传 PDF 作用域问答
+- [x] 同一 PDF 内容哈希去重与索引复用
+- [x] chunk metadata 与页码引用
+- [x] 聊天式前端界面
+- [x] 前端消息历史与引用展开
 
 ## Project Structure
 
 ```text
 pdf-chat-app/
 ├── frontend/   # Next.js frontend
-│   ├── src/components/  # Upload, question, answer panels
-│   └── src/lib/         # Frontend API wrappers
+│   ├── src/components/  # Upload, chat, citations UI
+│   ├── src/lib/         # Frontend API wrappers
+│   ├── src/types/       # Frontend chat/domain types
+│   └── src/test/        # Frontend test setup
 ├── backend/    # FastAPI backend
 │   ├── app/routes/    # FastAPI routes
-│   ├── app/services/  # PDF processing and business logic
+│   ├── app/services/  # PDF processing, dedupe, retrieval, QA
 │   ├── data/uploads/  # Local uploaded PDF storage
-│   └── data/index/    # FAISS indexes and chunk metadata
+│   └── data/index/    # FAISS indexes, chunk metadata, registry
 ├── README.md
 └── AGENTS.md
 ```
@@ -90,7 +96,7 @@ curl -X POST \
   http://127.0.0.1:8000/upload
 ```
 
-返回结果中会包含当前文档的 `document_id`。前端会自动保存这个值，并在后续提问时只检索这一次上传成功的 PDF。
+返回结果中会包含当前文档的 `document_id`，以及去重信息 `already_exists`、`indexed_new_chunks`。前端会自动保存这个值，并在后续提问时只检索这一次上传成功的 PDF。
 
 基于已上传 PDF 提问：
 
@@ -104,6 +110,22 @@ curl -X POST \
 说明：
 - 当后端只有一个索引文档时，`/ask` 可以不传 `document_id`
 - 当后端已经存在多个 PDF 索引时，必须传 `document_id`，否则后端会返回明确错误，避免把旧文档内容混入回答
+- `/ask` 返回的 `contexts` 已包含 `page_number`、`page_numbers`、`chunk_index` 等 metadata，`citations` 用于前端展示页码摘要
+
+### Frontend Verification
+
+```bash
+cd frontend
+npm run test
+npm run lint
+npm run build
+```
+
+当前前端体验：
+- 上传区域与聊天区分离
+- 连续多轮提问会保留消息历史
+- 每条 AI 消息可展开查看引用片段、页码与 chunk 编号
+- 未上传文档前会禁用提问输入框
 
 ### Embedding Config
 
@@ -132,9 +154,8 @@ EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 
 ## Next Plan
 
-1. 优化问答页面布局与移动端体验
-2. 改善引用片段去重与排序展示
-3. 增加历史问题或会话状态
-4. 增加检索调试信息与更细致的错误提示
-5. 进一步完善聊天式交互体验
-6. 增加多文档切换或文档列表选择能力
+1. 优化聊天界面的移动端体验与排版细节
+2. 增加多文档切换或文档列表选择能力
+3. 改善引用片段去重、排序和折叠体验
+4. 增加历史问题持久化或会话恢复能力
+5. 增加检索调试信息与更细致的错误提示

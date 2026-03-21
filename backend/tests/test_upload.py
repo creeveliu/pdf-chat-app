@@ -59,11 +59,13 @@ def test_upload_pdf_returns_parsed_metadata() -> None:
 
     body = response.json()
     assert body["document_id"]
+    assert body["already_exists"] is False
     assert body["filename"] == "sample.pdf"
     assert body["page_count"] == 3
     assert body["text_length"] > 0
     assert body["chunk_count"] > 1
     assert body["embedding_count"] == body["chunk_count"]
+    assert body["indexed_new_chunks"] == body["chunk_count"]
     assert "Hello from a PDF upload test." in body["preview"]
     assert len(body["preview"]) <= 1000
 
@@ -72,6 +74,34 @@ def test_upload_pdf_returns_parsed_metadata() -> None:
 
     assert len(saved_indexes) == 1
     assert len(saved_chunks) == 1
+
+
+def test_upload_reuses_existing_index_for_duplicate_pdf() -> None:
+    pdf_bytes = build_pdf_bytes(("Repeated PDF upload should not duplicate indexes. " * 60).strip(), page_count=2)
+
+    first_response = client.post(
+        "/upload",
+        files={"file": ("sample.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    )
+    second_response = client.post(
+        "/upload",
+        files={"file": ("sample.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+
+    first_body = first_response.json()
+    second_body = second_response.json()
+
+    assert first_body["already_exists"] is False
+    assert second_body["already_exists"] is True
+    assert second_body["document_id"] == first_body["document_id"]
+    assert second_body["indexed_new_chunks"] == 0
+    assert second_body["chunk_count"] == first_body["chunk_count"]
+    assert len(list((vector_store.INDEX_ROOT).glob("*/faiss.index"))) == 1
+    assert len(list((vector_store.INDEX_ROOT).glob("*/chunks.json"))) == 1
+    assert len(list((pdf_service.UPLOAD_DIR).glob("*.pdf"))) == 1
 
 
 def test_upload_rejects_non_pdf_file() -> None:

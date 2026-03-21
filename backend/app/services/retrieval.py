@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 import logging
 from dataclasses import dataclass
@@ -26,6 +27,10 @@ class RetrievedContext:
     document_id: str
     filename: str
     chunk_id: int
+    chunk_index: int
+    page_number: int | None
+    page_numbers: list[int]
+    chunk_hash: str
     text: str
     score: float
 
@@ -62,6 +67,53 @@ def _resolve_document_dirs(document_id: str | None) -> list:
     return document_dirs
 
 
+def _build_chunk_hash(chunk_payload: dict[str, object]) -> str:
+    stored_hash = chunk_payload.get("chunk_hash")
+    if isinstance(stored_hash, str) and stored_hash:
+        return stored_hash
+
+    text = str(chunk_payload.get("text", ""))
+    return sha256(text.encode("utf-8")).hexdigest()
+
+
+def _build_page_numbers(chunk_payload: dict[str, object]) -> list[int]:
+    stored_page_numbers = chunk_payload.get("page_numbers")
+    if isinstance(stored_page_numbers, list):
+        return [int(page_number) for page_number in stored_page_numbers if isinstance(page_number, (int, float))]
+
+    page_number = chunk_payload.get("page_number")
+    if isinstance(page_number, (int, float)):
+        return [int(page_number)]
+
+    return []
+
+
+def _build_primary_page_number(chunk_payload: dict[str, object]) -> int | None:
+    page_number = chunk_payload.get("page_number")
+    if isinstance(page_number, (int, float)):
+        return int(page_number)
+
+    page_numbers = _build_page_numbers(chunk_payload)
+    return page_numbers[0] if page_numbers else None
+
+
+def _deduplicate_matches(matches: list[RetrievedContext], top_k: int) -> list[RetrievedContext]:
+    unique_matches: list[RetrievedContext] = []
+    seen_keys: set[tuple[str, str]] = set()
+
+    for match in sorted(matches, key=lambda item: item.score):
+        dedupe_key = (match.document_id, match.chunk_hash)
+        if dedupe_key in seen_keys:
+            continue
+
+        seen_keys.add(dedupe_key)
+        unique_matches.append(match)
+        if len(unique_matches) >= top_k:
+            break
+
+    return unique_matches
+
+
 def retrieve_contexts(
     question: str,
     top_k: int = 3,
@@ -88,7 +140,7 @@ def retrieve_contexts(
             continue
 
         compatible_index_found = True
-        search_k = min(top_k, index.ntotal)
+        search_k = min(max(top_k * 5, top_k), index.ntotal)
         if search_k <= 0:
             continue
 
@@ -100,11 +152,17 @@ def retrieve_contexts(
                 continue
 
             chunk_payload = chunks[index_position]
+            chunk_index = int(chunk_payload.get("chunk_index", chunk_payload.get("chunk_id", index_position)))
+            page_numbers = _build_page_numbers(chunk_payload)
             matches.append(
                 RetrievedContext(
                     document_id=payload["document_id"],
                     filename=payload["filename"],
-                    chunk_id=chunk_payload["chunk_id"],
+                    chunk_id=chunk_index,
+                    chunk_index=chunk_index,
+                    page_number=_build_primary_page_number(chunk_payload),
+                    page_numbers=page_numbers,
+                    chunk_hash=_build_chunk_hash(chunk_payload),
                     text=chunk_payload["text"],
                     score=float(distance),
                 )
@@ -116,7 +174,6 @@ def retrieve_contexts(
     if not matches:
         raise RetrievalError("No vector index available. Upload a PDF first.")
 
-    matches.sort(key=lambda item: item.score)
-    selected = matches[:top_k]
+    selected = _deduplicate_matches(matches, top_k=top_k)
     logger.info("Retrieved %s contexts for question", len(selected))
     return selected

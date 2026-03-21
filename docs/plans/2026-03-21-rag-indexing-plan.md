@@ -2,13 +2,13 @@
 
 **Status:** Completed on 2026-03-21
 
-**Result:** `/upload` now performs parsing, chunking, embeddings, and FAISS persistence. The embedding layer supports both OpenAI and Alibaba DashScope compatible-mode configuration, and the flow has been verified with a real PDF upload.
+**Result:** `/upload` now performs parsing, chunking, embeddings, and FAISS persistence. The embedding layer supports both OpenAI and Alibaba DashScope compatible-mode configuration, duplicate uploads are deduplicated by file-content SHA-256, and the flow has been verified with a real PDF upload.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Extend the backend upload flow so each uploaded PDF is chunked, embedded with OpenAI, and persisted as a FAISS vector index plus chunk metadata.
 
-**Architecture:** Keep `/upload` in `backend/app/routes/`, keep orchestration in `backend/app/services/pdf_service.py`, and add dedicated modules for chunking, embeddings, and vector persistence. Store each PDF's artifacts under its own directory inside `backend/data/index/` so the implementation can grow to multiple documents cleanly.
+**Architecture:** Keep `/upload` in `backend/app/routes/`, keep orchestration in `backend/app/services/pdf_service.py`, and add dedicated modules for chunking, embeddings, vector persistence, and document registration. Store each PDF's artifacts under its own directory inside `backend/data/index/`, and maintain a registry keyed by file-content hash so duplicate uploads can reuse the same persisted index.
 
 **Tech Stack:** FastAPI, PyMuPDF, OpenAI Python SDK, FAISS, pytest
 

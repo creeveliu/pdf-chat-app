@@ -1,25 +1,41 @@
 export type UploadResponse = {
   document_id: string;
+  already_exists: boolean;
   filename: string;
   text_length: number;
   page_count: number;
   preview: string;
   chunk_count?: number;
   embedding_count?: number;
+  indexed_new_chunks?: number;
 };
 
 export type AskContext = {
   document_id: string;
   filename: string;
   chunk_id: number;
+  chunk_index?: number;
+  page_number?: number | null;
+  page_numbers?: number[];
+  chunk_hash?: string;
   text: string;
   score: number;
+};
+
+export type Citation = {
+  document_id: string;
+  filename: string;
+  chunk_id: number;
+  chunk_index: number;
+  page_number?: number | null;
+  page_numbers: number[];
 };
 
 export type AskResponse = {
   question: string;
   answer: string;
   contexts: AskContext[];
+  citations: Citation[];
   top_k: number;
 };
 

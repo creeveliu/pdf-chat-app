@@ -19,6 +19,7 @@ class AskResponseModel(BaseModel):
     question: str
     answer: str
     contexts: list[dict[str, object]]
+    citations: list[dict[str, object]]
     top_k: int
 
 

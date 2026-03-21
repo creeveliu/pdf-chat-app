@@ -1,6 +1,7 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
+from app.services.document_registry import DocumentRegistryError
 from app.services.embedding import EmbeddingServiceError
 from app.services.pdf_service import (
     PdfProcessingError,
@@ -16,12 +17,14 @@ router = APIRouter()
 
 class UploadResponse(BaseModel):
     document_id: str
+    already_exists: bool
     filename: str
     text_length: int
     page_count: int
     preview: str
     chunk_count: int
     embedding_count: int
+    indexed_new_chunks: int
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -42,6 +45,11 @@ async def upload_pdf(file: UploadFile = File(...)) -> UploadResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to store uploaded PDF.",
+        ) from exc
+    except DocumentRegistryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
         ) from exc
     except EmbeddingServiceError as exc:
         raise HTTPException(

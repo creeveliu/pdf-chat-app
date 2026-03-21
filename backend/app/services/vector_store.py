@@ -8,6 +8,8 @@ from pathlib import Path
 import faiss
 import numpy as np
 
+from app.services.chunking import ChunkRecord
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +37,16 @@ def ensure_index_root() -> Path:
     return INDEX_ROOT
 
 
+def document_artifacts_exist(document_id: str) -> bool:
+    document_dir = ensure_index_root() / document_id
+    return (document_dir / "faiss.index").exists() and (document_dir / "chunks.json").exists()
+
+
 def persist_document_index(
     document_id: str,
     filename: str,
-    chunks: list[str],
+    file_sha256: str,
+    chunks: list[ChunkRecord],
     embeddings: list[list[float]],
 ) -> VectorStoreArtifacts:
     if not chunks or not embeddings:
@@ -62,10 +70,18 @@ def persist_document_index(
         chunks_payload = {
             "document_id": document_id,
             "filename": filename,
+            "file_sha256": file_sha256,
             "chunk_count": len(chunks),
             "chunks": [
-                {"chunk_id": chunk_id, "text": text}
-                for chunk_id, text in enumerate(chunks)
+                {
+                    "chunk_id": chunk.chunk_index,
+                    "chunk_index": chunk.chunk_index,
+                    "page_number": chunk.page_number,
+                    "page_numbers": chunk.page_numbers,
+                    "chunk_hash": chunk.chunk_hash,
+                    "text": chunk.text,
+                }
+                for chunk in chunks
             ],
         }
         chunks_path.write_text(

@@ -64,7 +64,20 @@ export function UploadPanel({
         ) : null}
 
         {uploadResult ? (
-          <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700 sm:grid-cols-2">
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">索引状态</p>
+              <p className="mt-1 font-medium text-slate-900">
+                {uploadResult.already_exists
+                  ? "检测到重复文档，已复用已有索引。"
+                  : "已完成新文档解析与索引建立。"}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                document_id: <span className="font-mono text-slate-700">{uploadResult.document_id}</span>
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">文件名</p>
               <p className="mt-1 font-medium text-slate-900">{uploadResult.filename}</p>
@@ -80,6 +93,11 @@ export function UploadPanel({
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">分块数量</p>
               <p className="mt-1 font-medium text-slate-900">{uploadResult.chunk_count ?? "-"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">新增分块</p>
+              <p className="mt-1 font-medium text-slate-900">{uploadResult.indexed_new_chunks ?? "-"}</p>
+            </div>
             </div>
           </div>
         ) : null}

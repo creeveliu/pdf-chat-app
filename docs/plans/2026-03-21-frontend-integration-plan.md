@@ -2,13 +2,13 @@
 
 **Status:** Completed on 2026-03-21
 
-**Result:** The frontend now supports the full product flow in one page: PDF upload, upload status, indexing result display, question input, answer rendering, and cited context display. The page uses modular components, an isolated API client, environment-based backend URL configuration, and has been verified end-to-end against the running backend. The current upload result also owns the active `document_id`, so subsequent questions are scoped to the most recently indexed PDF.
+**Result:** The frontend now supports the full product flow in one page: PDF upload, upload status, indexing result display, question input, answer rendering, and cited context display. The page uses modular components, an isolated API client, environment-based backend URL configuration, and has been verified end-to-end against the running backend. The current upload result also owns the active `document_id`, so subsequent questions are scoped to the most recently indexed PDF. The UI has since been upgraded into a chat-style experience with message history, expandable citations, and a dedicated input composer.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Connect the existing Next.js frontend to the backend upload and ask APIs so users can upload a PDF, ask a question, and read the answer plus cited contexts from one page.
 
-**Architecture:** Keep page-level orchestration in `frontend/src/app/page.tsx`, move HTTP requests into `frontend/src/lib/api.ts`, and split the interface into focused client components under `frontend/src/components/`. Use a single environment variable for the backend base URL and simple `useState`-driven local state for the product flow.
+**Architecture:** Keep page-level orchestration in `frontend/src/app/page.tsx`, move HTTP requests into `frontend/src/lib/api.ts`, keep domain types under `frontend/src/types/`, and split the interface into focused client components under `frontend/src/components/`. Use a single environment variable for the backend base URL and simple `useState`-driven local state for upload state, active document state, and chat message history.
 
 **Tech Stack:** Next.js App Router, React 19, TypeScript, Tailwind CSS
 

@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import embedding, llm, pdf_service, vector_store
+from app.services import chunking, embedding, llm, pdf_service, vector_store
 
 
 client = TestClient(app)
@@ -70,6 +70,8 @@ def test_ask_returns_answer_and_contexts(monkeypatch: pytest.MonkeyPatch) -> Non
         assert len(contexts) == 2
         assert "PlayStation 5 Pro" in contexts[0]["text"]
         assert all(context["document_id"] == document_id for context in contexts)
+        assert contexts[0]["page_number"] >= 1
+        assert contexts[0]["page_numbers"] == [contexts[0]["page_number"]]
         return "这是一份 PlayStation 5 Pro 的快速开始指南。"
 
     monkeypatch.setattr(llm, "generate_answer", _generate_answer)
@@ -88,13 +90,27 @@ def test_ask_returns_answer_and_contexts(monkeypatch: pytest.MonkeyPatch) -> Non
     assert len(body["contexts"]) == 2
     assert body["contexts"][0]["filename"] == "guide.pdf"
     assert all(context["document_id"] == document_id for context in body["contexts"])
+    assert body["contexts"][0]["page_number"] >= 1
+    assert body["contexts"][0]["page_numbers"] == [body["contexts"][0]["page_number"]]
+    assert body["citations"]
+    assert body["citations"][0]["page_numbers"]
+    assert body["citations"][0]["chunk_index"] == body["contexts"][0]["chunk_index"]
 
 
 def test_ask_skips_incompatible_legacy_index(monkeypatch: pytest.MonkeyPatch) -> None:
     vector_store.persist_document_index(
         document_id="legacy-index",
         filename="legacy.pdf",
-        chunks=["legacy chunk"],
+        file_sha256="legacy-hash",
+        chunks=[
+            chunking.ChunkRecord(
+                chunk_index=0,
+                text="legacy chunk",
+                page_number=1,
+                page_numbers=[1],
+                chunk_hash="legacy-chunk-hash",
+            )
+        ],
         embeddings=[[1.0, 2.0, 3.0, 4.0]],
     )
 
@@ -144,3 +160,42 @@ def test_ask_requires_document_id_when_multiple_indexes_exist(monkeypatch: pytes
     assert response.json() == {
         "detail": "Multiple indexed PDFs are available. Specify document_id to ask about a specific file."
     }
+
+
+def test_ask_deduplicates_contexts_after_duplicate_upload(monkeypatch: pytest.MonkeyPatch) -> None:
+    repeated_page = ("PlayStation 5 Pro repeated instructions for setup and power management. " * 18).strip()
+    pdf_bytes = build_pdf_bytes(repeated_page, page_count=3)
+
+    first_upload = client.post(
+        "/upload",
+        files={"file": ("guide.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    )
+    second_upload = client.post(
+        "/upload",
+        files={"file": ("guide.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    )
+
+    assert first_upload.status_code == 200
+    assert second_upload.status_code == 200
+    assert second_upload.json()["already_exists"] is True
+
+    document_id = second_upload.json()["document_id"]
+
+    def _generate_answer(question: str, contexts: list[dict[str, object]]) -> str:
+        assert question == "这份 PDF 主要讲了什么？"
+        texts = [context["text"] for context in contexts]
+        assert len(texts) == len(set(texts))
+        return "这是一份不包含重复引用片段的回答。"
+
+    monkeypatch.setattr(llm, "generate_answer", _generate_answer)
+
+    response = client.post(
+        "/ask",
+        json={"question": "这份 PDF 主要讲了什么？", "top_k": 3, "document_id": document_id},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    texts = [context["text"] for context in body["contexts"]]
+    assert body["answer"] == "这是一份不包含重复引用片段的回答。"
+    assert len(texts) == len(set(texts))

@@ -67,13 +67,20 @@ def generate_answer(question: str, contexts: list[dict[str, object]]) -> str:
     logger.info("Generating answer with provider=%s model=%s", settings.provider, settings.model)
 
     context_text = "\n\n".join(
-        f"[{index + 1}] {context['filename']}#{context['chunk_id']}\n{context['text']}"
+        (
+            f"[{index + 1}] {context['filename']} "
+            f"(chunk #{context['chunk_index']}, pages {','.join(str(page) for page in context.get('page_numbers', [])) or 'unknown'})\n"
+            f"{context['text']}"
+        )
         for index, context in enumerate(contexts)
     )
 
     system_prompt = (
         "你是一个严格基于 PDF 内容回答问题的助手。"
         "你只能依据提供的上下文回答。"
+        "回答时优先引用提供的检索片段。"
+        "如果上下文清楚指向具体页码，你可以自然地写出“第X页”或“第X-Y页”。"
+        "如果无法从上下文确认页码，就不要编造页码。"
         "如果上下文无法支持答案，必须明确回答：我无法从当前 PDF 中找到答案。"
         "不要编造，不要补充上下文之外的信息。"
     )
