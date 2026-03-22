@@ -38,3 +38,22 @@ def test_build_allow_origin_regex_reads_optional_env(monkeypatch) -> None:
     monkeypatch.setenv("CORS_ALLOW_ORIGIN_REGEX", r"https://pdf-chat-.*\.vercel\.app")
 
     assert main.build_allow_origin_regex() == r"https://pdf-chat-.*\.vercel\.app"
+
+
+def test_build_health_payload_includes_deployment_metadata(monkeypatch) -> None:
+    monkeypatch.setenv("APP_VERSION", "0.2.0")
+    monkeypatch.setenv("DEPLOYMENT_ENV", "production")
+    monkeypatch.setenv("DEPLOYED_COMMIT_SHA", "ffafadd")
+    monkeypatch.setenv("DEPLOYED_AT", "2026-03-22T11:11:11Z")
+
+    payload = main.build_health_payload()
+
+    assert payload == {
+        "status": "ok",
+        "version": "0.2.0",
+        "deployment": {
+            "environment": "production",
+            "commit_sha": "ffafadd",
+            "deployed_at": "2026-03-22T11:11:11Z",
+        },
+    }

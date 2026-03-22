@@ -54,6 +54,18 @@ def build_allow_origin_regex() -> str | None:
     return regex or None
 
 
+def build_health_payload() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "version": os.getenv("APP_VERSION", app.version),
+        "deployment": {
+            "environment": os.getenv("DEPLOYMENT_ENV", "unknown"),
+            "commit_sha": os.getenv("DEPLOYED_COMMIT_SHA", "unknown"),
+            "deployed_at": os.getenv("DEPLOYED_AT", "unknown"),
+        },
+    }
+
+
 def run_startup_cleanup() -> None:
     try:
         cleanup_service.cleanup_expired_documents()
@@ -92,5 +104,5 @@ async def read_root() -> dict[str, str]:
 
 
 @app.get("/health")
-async def healthcheck() -> dict[str, str]:
-    return {"status": "ok"}
+async def healthcheck() -> dict[str, object]:
+    return build_health_payload()

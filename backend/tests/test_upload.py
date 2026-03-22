@@ -55,7 +55,15 @@ def test_status_endpoints_still_work() -> None:
     assert root_response.status_code == 200
     assert root_response.json() == {"message": "PDF Chat API is running."}
     assert health_response.status_code == 200
-    assert health_response.json() == {"status": "ok"}
+    assert health_response.json() == {
+        "status": "ok",
+        "version": "0.1.0",
+        "deployment": {
+            "environment": "unknown",
+            "commit_sha": "unknown",
+            "deployed_at": "unknown",
+        },
+    }
 
 
 def test_upload_pdf_returns_parsed_metadata() -> None:
