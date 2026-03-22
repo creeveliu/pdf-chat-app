@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import json
 from pathlib import Path
@@ -7,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import embedding, vector_store
+from app.services import document_registry, embedding, vector_store
 from app.services import pdf_service
 
 
@@ -76,8 +77,14 @@ def test_upload_pdf_returns_parsed_metadata() -> None:
     assert body["chunk_count"] > 1
     assert body["embedding_count"] == body["chunk_count"]
     assert body["indexed_new_chunks"] == body["chunk_count"]
+    assert body["expires_at"]
     assert "Hello from a PDF upload test." in body["preview"]
     assert len(body["preview"]) <= 1000
+
+    registry = document_registry.load_registry()
+    stored_document = registry[document_registry.compute_file_sha256(pdf_bytes)]
+    assert stored_document.uploaded_at
+    assert stored_document.expires_at == body["expires_at"]
 
     saved_indexes = list((vector_store.INDEX_ROOT).glob("*/faiss.index"))
     saved_chunks = list((vector_store.INDEX_ROOT).glob("*/chunks.json"))
@@ -109,9 +116,43 @@ def test_upload_reuses_existing_index_for_duplicate_pdf() -> None:
     assert second_body["document_id"] == first_body["document_id"]
     assert second_body["indexed_new_chunks"] == 0
     assert second_body["chunk_count"] == first_body["chunk_count"]
+    assert datetime.fromisoformat(second_body["expires_at"]) >= datetime.fromisoformat(first_body["expires_at"])
     assert len(list((vector_store.INDEX_ROOT).glob("*/faiss.index"))) == 1
     assert len(list((vector_store.INDEX_ROOT).glob("*/chunks.json"))) == 1
     assert len(list((pdf_service.UPLOAD_DIR).glob("*.pdf"))) == 1
+
+
+def test_duplicate_upload_refreshes_document_expiration(monkeypatch: pytest.MonkeyPatch) -> None:
+    pdf_bytes = build_pdf_bytes(("Repeated PDF upload should refresh expiration. " * 60).strip(), page_count=2)
+    first_now = datetime(2026, 3, 22, 10, 0, tzinfo=timezone.utc)
+    second_now = first_now + timedelta(hours=6)
+    timestamps = [
+        (first_now.isoformat(), (first_now + timedelta(days=1)).isoformat()),
+        (second_now.isoformat(), (second_now + timedelta(days=1)).isoformat()),
+    ]
+
+    monkeypatch.setattr("app.services.cleanup_service.cleanup_expired_documents", lambda: [])
+    monkeypatch.setattr(
+        "app.services.cleanup_service.build_expiration_timestamps",
+        lambda: timestamps.pop(0),
+    )
+
+    first_response = client.post(
+        "/upload",
+        files={"file": ("sample.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    )
+    second_response = client.post(
+        "/upload",
+        files={"file": ("sample.pdf", BytesIO(pdf_bytes), "application/pdf")},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+
+    first_expires_at = datetime.fromisoformat(first_response.json()["expires_at"])
+    second_expires_at = datetime.fromisoformat(second_response.json()["expires_at"])
+    assert second_expires_at == second_now + timedelta(days=1)
+    assert second_expires_at > first_expires_at
 
 
 def test_upload_rejects_non_pdf_file() -> None:

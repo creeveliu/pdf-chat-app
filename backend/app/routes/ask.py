@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.services.cleanup_service import DocumentExpiredError
 from app.services.llm import LlmServiceError
 from app.services.qa_service import AskResponse, QuestionValidationError, ask_question, stream_question
 from app.services.retrieval import DocumentSelectionError, RetrievalError
@@ -53,6 +54,11 @@ async def ask_route(payload: AskRequest) -> AskResponseModel:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
+    except DocumentExpiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
     except LlmServiceError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -81,6 +87,11 @@ async def ask_stream_route(payload: AskRequest) -> StreamingResponse:
             detail=str(exc),
         ) from exc
     except RetrievalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except DocumentExpiredError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),

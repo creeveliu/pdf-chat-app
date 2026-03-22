@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import faiss
 import numpy as np
 
-from app.services import embedding, vector_store
+from app.services import cleanup_service, embedding, vector_store
 
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,10 @@ def _load_index_payload(document_dir) -> tuple[faiss.Index, dict]:
 
 
 def _resolve_document_dirs(document_id: str | None) -> list:
+    if document_id:
+        cleanup_service.ensure_document_available(document_id)
+
+    cleanup_service.cleanup_expired_documents()
     index_root = vector_store.ensure_index_root()
     document_dirs = [path for path in index_root.iterdir() if path.is_dir()]
     if not document_dirs:

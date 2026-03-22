@@ -50,6 +50,10 @@ function createAssistantMessage(): ChatMessage {
   };
 }
 
+function isExpiredDocumentError(message: string): boolean {
+  return message.includes("已过期并已自动清理");
+}
+
 function buildUploadStageStatus(event: UploadStageEvent): string {
   switch (event.stage) {
     case "upload_received":
@@ -218,8 +222,12 @@ export default function Home() {
       setAskStatus(`已返回回答，并命中 ${result.contexts.length} 个引用片段。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "提问失败。";
+      const isExpiredDocument = isExpiredDocumentError(message);
       setAskError(message);
-      setAskStatus("提问失败。");
+      setAskStatus(isExpiredDocument ? "当前文档已超过 1 天保留期，请重新上传 PDF。" : "提问失败。");
+      if (isExpiredDocument) {
+        setUploadResult(null);
+      }
       setMessages((currentMessages) => [
         ...currentMessages.filter((currentMessage) => currentMessage.id !== assistantMessage.id),
         createSystemMessage(`提问失败：${message}`, "error"),

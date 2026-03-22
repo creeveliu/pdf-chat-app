@@ -197,4 +197,40 @@ describe("Home streaming chat", () => {
 
     expect(screen.getByText("dropped-guide.pdf")).toBeInTheDocument();
   });
+
+  it("shows an expiration hint when the current document has been auto-cleaned", async () => {
+    mockedUploadPdfStream.mockResolvedValue({
+      document_id: "doc-1",
+      already_exists: false,
+      filename: "guide.pdf",
+      text_length: 1200,
+      page_count: 12,
+      preview: "preview",
+      chunk_count: 6,
+      indexed_new_chunks: 6,
+      expires_at: "2026-03-23T10:00:00+00:00",
+    });
+    mockedAskQuestionStream.mockRejectedValue(
+      new Error("指定文档已过期并已自动清理，请重新上传 PDF。"),
+    );
+
+    const { container } = render(<Home />);
+    const file = new File(["pdf"], "guide.pdf", { type: "application/pdf" });
+    const fileInput = container.querySelector('input[type="file"]');
+    expect(fileInput).not.toBeNull();
+
+    fireEvent.change(fileInput as HTMLInputElement, {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "上传 PDF" }));
+    await screen.findByText("上传完成：guide.pdf");
+
+    fireEvent.change(screen.getByPlaceholderText("例如：这份说明书主要讲了什么？"), {
+      target: { value: "这份 PDF 还能继续问吗？" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送问题" }));
+
+    await screen.findByText("提问失败：指定文档已过期并已自动清理，请重新上传 PDF。");
+    expect(screen.getByText("当前文档已超过 1 天保留期，请重新上传 PDF。")).toBeInTheDocument();
+  });
 });

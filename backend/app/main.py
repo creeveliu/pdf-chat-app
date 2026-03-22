@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,7 @@ from dotenv import load_dotenv
 
 from app.routes.ask import router as ask_router
 from app.routes.upload import router as upload_router
+from app.services import cleanup_service
 
 logging.basicConfig(level=logging.INFO)
 load_dotenv()
@@ -51,10 +53,24 @@ def build_allow_origin_regex() -> str | None:
     regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "").strip()
     return regex or None
 
+
+def run_startup_cleanup() -> None:
+    try:
+        cleanup_service.cleanup_expired_documents()
+    except Exception:
+        logging.exception("Startup document cleanup failed")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    run_startup_cleanup()
+    yield
+
 app = FastAPI(
     title="PDF Chat API",
     description="Backend service for uploading PDFs and asking AI questions.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

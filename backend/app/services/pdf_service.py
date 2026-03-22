@@ -8,7 +8,7 @@ from typing import Callable
 import fitz
 from fastapi import UploadFile
 
-from app.services import chunking, document_registry, embedding, vector_store
+from app.services import chunking, cleanup_service, document_registry, embedding, vector_store
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -44,6 +44,7 @@ class PdfUploadResponse:
     chunk_count: int
     embedding_count: int
     indexed_new_chunks: int
+    expires_at: str | None = None
 
 
 def ensure_upload_dir() -> Path:
@@ -113,6 +114,7 @@ def process_pdf_upload(
     content_type: str | None,
     progress_callback: UploadProgressCallback | None = None,
 ) -> PdfUploadResponse:
+    cleanup_service.cleanup_expired_documents()
     validate_pdf_upload(filename, content_type, file_bytes)
     logger.info("Received upload: %s", filename)
     _emit_progress(
@@ -128,6 +130,22 @@ def process_pdf_upload(
     existing_document = document_registry.get_document_by_hash(file_sha256)
 
     if existing_document and vector_store.document_artifacts_exist(existing_document.document_id):
+        uploaded_at, expires_at = cleanup_service.build_expiration_timestamps()
+        document_registry.save_document(
+            document_registry.RegisteredDocument(
+                document_id=existing_document.document_id,
+                file_sha256=existing_document.file_sha256,
+                filename=existing_document.filename,
+                storage_filename=existing_document.storage_filename,
+                page_count=existing_document.page_count,
+                text_length=existing_document.text_length,
+                preview=existing_document.preview,
+                chunk_count=existing_document.chunk_count,
+                embedding_count=existing_document.embedding_count,
+                uploaded_at=uploaded_at,
+                expires_at=expires_at,
+            )
+        )
         logger.info(
             "Reusing existing index for %s with document_id=%s",
             filename,
@@ -152,6 +170,7 @@ def process_pdf_upload(
             chunk_count=existing_document.chunk_count,
             embedding_count=existing_document.embedding_count,
             indexed_new_chunks=0,
+            expires_at=expires_at,
         )
 
     _emit_progress(
@@ -209,6 +228,7 @@ def process_pdf_upload(
             progress_callback=embedding_progress_callback,
         )
     document_id = existing_document.document_id if existing_document else document_registry.build_document_id(file_sha256)
+    uploaded_at, expires_at = cleanup_service.build_expiration_timestamps()
     _emit_progress(
         progress_callback,
         "stage",
@@ -236,6 +256,8 @@ def process_pdf_upload(
             preview=text[:PREVIEW_LENGTH],
             chunk_count=len(chunks),
             embedding_count=len(embeddings),
+            uploaded_at=uploaded_at,
+            expires_at=expires_at,
         )
     )
     logger.info(
@@ -254,6 +276,7 @@ def process_pdf_upload(
         chunk_count=len(chunks),
         embedding_count=len(embeddings),
         indexed_new_chunks=len(chunks),
+        expires_at=expires_at,
     )
 
 

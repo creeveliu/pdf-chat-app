@@ -35,6 +35,7 @@ class UploadResponse(BaseModel):
     chunk_count: int
     embedding_count: int
     indexed_new_chunks: int
+    expires_at: str | None = None
 
 
 @router.post("/upload", response_model=UploadResponse)

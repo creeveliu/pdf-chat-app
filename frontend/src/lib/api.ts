@@ -8,6 +8,7 @@ export type UploadResponse = {
   chunk_count?: number;
   embedding_count?: number;
   indexed_new_chunks?: number;
+  expires_at?: string | null;
 };
 
 export type UploadStageEvent = {
