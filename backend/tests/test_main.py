@@ -78,3 +78,4 @@ def test_build_health_payload_prefers_railway_variables(monkeypatch) -> None:
         "deployed_at": payload["deployment"]["deployed_at"],
     }
     assert payload["deployment"]["deployed_at"] != "unknown"
+    assert payload["deployment"]["deployed_at"].endswith("+08:00")

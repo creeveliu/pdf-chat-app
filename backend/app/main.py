@@ -1,7 +1,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +18,8 @@ DEFAULT_ALLOWED_ORIGINS = (
     "http://127.0.0.1:3000",
     "http://localhost:3000",
 )
-PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat()
+BEIJING_TZ = timezone(timedelta(hours=8))
+PROCESS_STARTED_AT = datetime.now(BEIJING_TZ).isoformat()
 
 
 def _normalize_origin(origin: str) -> str:
