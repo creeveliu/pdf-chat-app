@@ -1,6 +1,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +18,7 @@ DEFAULT_ALLOWED_ORIGINS = (
     "http://127.0.0.1:3000",
     "http://localhost:3000",
 )
+PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat()
 
 
 def _normalize_origin(origin: str) -> str:
@@ -59,11 +61,20 @@ def build_health_payload() -> dict[str, object]:
         "status": "ok",
         "version": os.getenv("APP_VERSION", app.version),
         "deployment": {
-            "environment": os.getenv("DEPLOYMENT_ENV", "unknown"),
-            "commit_sha": os.getenv("DEPLOYED_COMMIT_SHA", "unknown"),
-            "deployed_at": os.getenv("DEPLOYED_AT", "unknown"),
+            "environment": _first_non_empty_env("DEPLOYMENT_ENV", "RAILWAY_ENVIRONMENT_NAME", "VERCEL_ENV"),
+            "commit_sha": _first_non_empty_env("DEPLOYED_COMMIT_SHA", "RAILWAY_GIT_COMMIT_SHA", "VERCEL_GIT_COMMIT_SHA"),
+            "deployment_id": _first_non_empty_env("RAILWAY_DEPLOYMENT_ID", "VERCEL_DEPLOYMENT_ID"),
+            "deployed_at": _first_non_empty_env("DEPLOYED_AT", default=PROCESS_STARTED_AT),
         },
     }
+
+
+def _first_non_empty_env(*names: str, default: str = "unknown") -> str:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return default
 
 
 def run_startup_cleanup() -> None:

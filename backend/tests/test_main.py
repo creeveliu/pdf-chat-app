@@ -54,6 +54,27 @@ def test_build_health_payload_includes_deployment_metadata(monkeypatch) -> None:
         "deployment": {
             "environment": "production",
             "commit_sha": "ffafadd",
+            "deployment_id": "unknown",
             "deployed_at": "2026-03-22T11:11:11Z",
         },
     }
+
+
+def test_build_health_payload_prefers_railway_variables(monkeypatch) -> None:
+    monkeypatch.delenv("APP_VERSION", raising=False)
+    monkeypatch.delenv("DEPLOYMENT_ENV", raising=False)
+    monkeypatch.delenv("DEPLOYED_COMMIT_SHA", raising=False)
+    monkeypatch.delenv("DEPLOYED_AT", raising=False)
+    monkeypatch.setenv("RAILWAY_ENVIRONMENT_NAME", "production")
+    monkeypatch.setenv("RAILWAY_GIT_COMMIT_SHA", "1416e61abcdef")
+    monkeypatch.setenv("RAILWAY_DEPLOYMENT_ID", "dpl_123")
+
+    payload = main.build_health_payload()
+
+    assert payload["deployment"] == {
+        "environment": "production",
+        "commit_sha": "1416e61abcdef",
+        "deployment_id": "dpl_123",
+        "deployed_at": payload["deployment"]["deployed_at"],
+    }
+    assert payload["deployment"]["deployed_at"] != "unknown"
